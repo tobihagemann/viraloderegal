@@ -1,0 +1,45 @@
+{
+  "name": "viraloderegal",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @viraloderegal/shared build && concurrently -k -n shared,web,api -c yellow,blue,green \"pnpm --filter @viraloderegal/shared dev\" \"pnpm --filter @viraloderegal/web dev\" \"pnpm --filter @viraloderegal/api dev\"",
+    "dev:db": "docker compose up -d postgres",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @viraloderegal/shared build && pnpm -r test",
+    "typecheck": "pnpm --filter @viraloderegal/shared build && pnpm -r typecheck",
+    "e2e": "pnpm --filter @viraloderegal/api build && playwright test",
+    "lint": "eslint .",
+    "knip": "knip",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "migrate": "pnpm --filter @viraloderegal/api migrate",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,vue,js,cjs,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml,css,html}": "prettier --write"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.19.19",
+    "concurrently": "^10.0.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.9.1",
+    "husky": "^9.1.7",
+    "knip": "^6.14.2",
+    "lint-staged": "^17.0.5",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0"
+  }
+}

@@ -1,0 +1,23 @@
+# Reinstalled inside the image from the lockfile; never copy host artifacts in.
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+
+# VCS, CI, and local-only config.
+.git
+.github
+.husky
+
+# Secrets and env overrides — must never enter the build context.
+.env
+.env.*
+
+# Dev-only assets and tooling not needed to build or run the image.
+docker-compose.yml
+docker-compose.prod.yml
+.turbo
+test-results
+playwright-report
+tests
+**/*.test.ts

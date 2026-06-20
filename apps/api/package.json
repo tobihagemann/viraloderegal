@@ -1,0 +1,37 @@
+{
+  "name": "@viraloderegal/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts",
+    "build": "tsc --build",
+    "start": "node --env-file-if-exists=../../.env dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "migrate": "node --env-file-if-exists=../../.env --import tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "@viraloderegal/shared": "workspace:*",
+    "hono": "^4.12.23",
+    "kysely": "^0.29.2",
+    "pg": "^8.21.0",
+    "tsx": "^4.22.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "@types/pg": "^8.20.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}

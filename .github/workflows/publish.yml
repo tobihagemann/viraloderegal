@@ -1,0 +1,63 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+      # Build once into the local daemon (cached) so the deploy chain can be smoke-tested before publishing.
+      # Same labels as the publish build below so the smoke-tested image config matches what gets pushed.
+      - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          load: true
+          tags: viraloderegal:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Run the built image through the prod compose against a throwaway Postgres: proves the entrypoint's
+      # deploy chain (tsx + dist/db/migrate.js + bundled migrations) runs and the app reports healthy.
+      - name: Smoke-test the deploy chain
+        run: |
+          cat > .env <<'EOF'
+          POSTGRES_USER=viraloderegal
+          POSTGRES_PASSWORD=viraloderegal
+          POSTGRES_DB=viraloderegal
+          DATABASE_URL=postgres://viraloderegal:viraloderegal@postgres:5432/viraloderegal
+          NODE_ENV=production
+          VIRALODEREGAL_IMAGE=viraloderegal:ci
+          EOF
+          # Tear the stack down even if the health wait or curl fails, so nothing is left running.
+          trap 'docker compose -f docker-compose.prod.yml down -v' EXIT
+          docker compose -f docker-compose.prod.yml up -d --wait --wait-timeout 120
+          curl -fsS http://localhost:3000/health
+      # Re-run with push (fully cached from the build above) to publish the real tags only after the smoke test passed.
+      - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

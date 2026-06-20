@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // The Kysely schema (db/kysely.ts) exports every table interface but references most of them only through
+  // the in-file `DB` map, so knip's cross-file usage check can flip them to "unused" as the module graph
+  // shifts. They are part of the schema's public surface, so treat in-file use as use — but only for types,
+  // so genuinely dead value exports (functions/consts) are still reported even when self-referenced in-file.
+  "ignoreExportsUsedInFile": { "interface": true, "type": true },
+  "workspaces": {
+    "apps/api": {
+      // Migrations are discovered and imported at runtime by Kysely's FileMigrationProvider, not statically.
+      "ignore": ["migrations/**"],
+    },
+  },
+}

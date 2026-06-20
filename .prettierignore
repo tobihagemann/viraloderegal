@@ -1,0 +1,2 @@
+# Everything in .gitignore is already ignored by Prettier; only the committed lockfile needs listing.
+pnpm-lock.yaml

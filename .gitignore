@@ -1,0 +1,20 @@
+node_modules/
+dist/
+
+# Build info
+*.tsbuildinfo
+
+# Env files (dev runs on sensible defaults; copy .env.example to override)
+.env
+.env.*
+!.env.example
+
+# Playwright
+playwright-report/
+test-results/
+
+# Editor / OS
+.DS_Store
+
+# Turbo artifacts
+.turbo/
