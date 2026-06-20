@@ -3,7 +3,7 @@
 # Single image that runs apps/api and serves the built apps/web. glibc base (bookworm) matches the tsx
 # prebuilds (musl/Alpine would pull source builds). Pinned by digest for reproducible builds — bump the
 # digest deliberately to pick up base image (security) updates.
-FROM node:22-bookworm-slim@sha256:5a2976b1777a4c9db2ed466dd01403695bd9875ec5d20db3c7e8e8d3b2320fce AS base
+FROM node:22-bookworm-slim@sha256:d9f850096136edbc402debdd8729579a288aac64574ada0ff4db26b6ae58b0b2 AS base
 WORKDIR /app
 
 FROM base AS build
