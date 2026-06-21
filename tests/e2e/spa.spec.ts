@@ -1,8 +1,16 @@
-import { expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 // Distinct fake client IPs isolate the per-IP REST rate-limit buckets, mirroring the raw-protocol helpers.
 // The browser drives the SPA end to end; the clip phase advances on the server's own timer, so the flow
-// does not depend on YouTube playback actually loading in the test browser.
+// does not depend on YouTube playback.
+
+// Block YouTube so the embedded player never initializes. Otherwise a region where the seeded clips are
+// non-embeddable makes the host's player error, which triggers reportClipFailure and swaps clips until the
+// pool is exhausted (ending the game before a guess phase). With the player gone, the clip phase advances
+// purely on the server timer, keeping this UI flow deterministic across environments.
+async function blockYouTube(context: BrowserContext): Promise<void> {
+  await context.route(/youtube(-nocookie)?\.com/, (route) => route.abort());
+}
 
 async function setSelect(page: Page, ariaLabel: string, optionText: string): Promise<void> {
   await page.locator(`[aria-label="${ariaLabel}"]`).click();
@@ -33,6 +41,8 @@ test('host and guest play a full game through the UI and start a rematch', async
   test.setTimeout(300_000);
   const hostContext = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': '198.51.100.140' } });
   const guestContext = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': '198.51.100.141' } });
+  await blockYouTube(hostContext);
+  await blockYouTube(guestContext);
   const host = await hostContext.newPage();
   const guest = await guestContext.newPage();
 
