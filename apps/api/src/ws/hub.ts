@@ -5,6 +5,7 @@ import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { db } from '../db/kysely.js';
 import { assignHost, cancelGraceTimer, handBackHost, onPlayerDisconnected, resumeIfPaused } from '../rooms/lifecycle.js';
 import { withRoomLock } from '../rooms/roomLock.js';
+import { buildGameSnapshot, reportClipFailure, skipIntermission, startGame, submitGuess } from '../rooms/scheduler.js';
 import { buildLobbyState, broadcastLobby } from '../rooms/snapshot.js';
 import { banPlayer, kickPlayer, type ModerationResult, renameInLobby, setSoundActivated } from '../rooms/service.js';
 import { addConnection, broadcast, connectedPlayerIds, removeConnection, socketFor } from './registry.js';
@@ -62,15 +63,24 @@ async function onMessage(session: Session, raw: RawData): Promise<void> {
     return;
   }
   const command = parsed.data;
-  if (command.type === 'join') {
-    await handleJoin(session, command.sessionToken);
-    return;
+  // A command body can throw on a genuine fault — e.g. a guess racing the guesser's own kick/ban inserts a
+  // row referencing the just-deleted player and hits a foreign-key violation. The socket 'message' handler
+  // invokes this with `void`, so an escaping rejection would be unhandled and crash the single authoritative
+  // process, taking down every room. Contain it here: log and surface a generic error instead.
+  try {
+    if (command.type === 'join') {
+      await handleJoin(session, command.sessionToken);
+      return;
+    }
+    if (!session.playerId || !session.roomId) {
+      sendError(session.socket, 'not_joined', 'Send a join command first');
+      return;
+    }
+    await dispatch(session, session.playerId, session.roomId, command);
+  } catch (err) {
+    console.error('Command handling failed:', err);
+    sendError(session.socket, 'internal_error', 'Something went wrong');
   }
-  if (!session.playerId || !session.roomId) {
-    sendError(session.socket, 'not_joined', 'Send a join command first');
-    return;
-  }
-  await dispatch(session, session.playerId, session.roomId, command);
 }
 
 async function handleJoin(session: Session, sessionToken: string): Promise<void> {
@@ -126,7 +136,10 @@ async function handleJoin(session: Session, sessionToken: string): Promise<void>
       await db.updateTable('players').set({ disconnected_at: null }).where('id', '=', player.id).execute();
       await resumeIfPaused(player.room_id, wasEmpty);
       const lobby = await buildLobbyState(player.room_id, connectedPlayerIds(player.room_id));
-      sendEvent(session.socket, { type: 'snapshot', you: player.id, lobby });
+      // The reconnecting socket alone gets the game state (per-socket, not broadcast) so its own countdown
+      // resumes mid-phase without disrupting already-synced clients.
+      const game = await buildGameSnapshot(player.room_id, player.id);
+      sendEvent(session.socket, { type: 'snapshot', you: player.id, lobby, game });
       broadcast(player.room_id, { type: 'lobby', lobby });
     });
   } finally {
@@ -135,6 +148,12 @@ async function handleJoin(session: Session, sessionToken: string): Promise<void>
 }
 
 async function dispatch(session: Session, playerId: string, roomId: string, command: ClientCommand): Promise<void> {
+  // Drop a frame from a socket that is no longer the player's registered connection: a supersede (reconnect
+  // on a new socket) or a cleanup/kick eviction removes it from the registry, after which its command would
+  // run — and broadcast/lobby reads — against rows that may already be gone.
+  if (socketFor(playerId) !== session.socket) {
+    return;
+  }
   switch (command.type) {
     case 'setName':
       await withRoomLock(roomId, async () => {
@@ -170,11 +189,36 @@ async function dispatch(session: Session, playerId: string, roomId: string, comm
         await broadcastLobby(roomId);
       });
       return;
-    case 'start':
-    case 'guess':
-    case 'skipIntermission':
-      sendError(session.socket, 'not_implemented', 'Gameplay is not available yet');
+    case 'start': {
+      // The scheduler functions self-lock (they are also driven by timers with no hub frame), so they are
+      // called unwrapped here — a nested withRoomLock for the same room would deadlock.
+      const result = await startGame(roomId, playerId, command.settings);
+      if (!result.ok) {
+        sendError(session.socket, result.error, 'Start rejected');
+      }
       return;
+    }
+    case 'guess': {
+      const result = await submitGuess(roomId, playerId, command.value);
+      if (!result.ok) {
+        sendError(session.socket, result.error, 'Guess rejected');
+      }
+      return;
+    }
+    case 'skipIntermission': {
+      const result = await skipIntermission(roomId, playerId);
+      if (!result.ok) {
+        sendError(session.socket, result.error, 'Skip rejected');
+      }
+      return;
+    }
+    case 'reportClipFailure': {
+      const result = await reportClipFailure(roomId, playerId, command.roundId);
+      if (!result.ok) {
+        sendError(session.socket, result.error, 'Clip failure rejected');
+      }
+      return;
+    }
   }
 }
 

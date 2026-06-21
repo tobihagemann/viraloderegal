@@ -35,6 +35,13 @@ describe('clientCommandSchema', () => {
     expect(clientCommandSchema.safeParse({ type: 'setName', name: 'Alex' }).success).toBe(true);
   });
 
+  it('routes the gameplay commands and requires a uuid for the clip-failure round', () => {
+    expect(clientCommandSchema.safeParse({ type: 'start', settings: { source: 'random', roundsTotal: 5, guessTimerSec: 30 } }).success).toBe(true);
+    expect(clientCommandSchema.safeParse({ type: 'skipIntermission' }).success).toBe(true);
+    expect(clientCommandSchema.safeParse({ type: 'reportClipFailure', roundId: UUID }).success).toBe(true);
+    expect(clientCommandSchema.safeParse({ type: 'reportClipFailure', roundId: 'not-a-uuid' }).success).toBe(false);
+  });
+
   it('rejects an unknown command type', () => {
     expect(clientCommandSchema.safeParse({ type: 'nope' }).success).toBe(false);
   });
@@ -78,5 +85,67 @@ describe('serverEventSchema', () => {
     expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'kick' }).success).toBe(true);
     expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'ban' }).success).toBe(true);
     expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'left' }).success).toBe(false);
+  });
+
+  it('accepts the gameplay events with their payloads', () => {
+    const at = '2026-06-20T12:00:00.000Z';
+    expect(
+      serverEventSchema.safeParse({
+        type: 'round',
+        roundId: UUID,
+        roundNo: 1,
+        roundsTotal: 5,
+        youtubeId: 'dQw4w9WgXcQ',
+        clipStartSec: 43,
+        clipEndSec: 53,
+        phase: 'clip',
+        phaseEndAt: at,
+      }).success,
+    ).toBe(true);
+    const results = [{ playerName: 'Alex', guess: 100, distance: 30, points: 1, isWinner: true }];
+    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, results, phaseEndAt: at }).success).toBe(true);
+    const standings = [{ playerName: 'Alex', totalPoints: 1, rank: 1 }];
+    expect(serverEventSchema.safeParse({ type: 'leaderboard', standings, phaseEndAt: at }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'gameOver', standings, rounds: [{ roundNo: 1, viewCount: 130, results }] }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'roomWarning', secondsRemaining: 60 }).success).toBe(true);
+  });
+
+  it('rejects a round event with a non-uuid roundId and a reveal carrying a malformed result', () => {
+    const at = '2026-06-20T12:00:00.000Z';
+    expect(
+      serverEventSchema.safeParse({
+        type: 'round',
+        roundId: 'nope',
+        roundNo: 1,
+        roundsTotal: 5,
+        youtubeId: 'x',
+        clipStartSec: 1,
+        clipEndSec: 4,
+        phase: 'clip',
+        phaseEndAt: at,
+      }).success,
+    ).toBe(false);
+    const badResults = [{ playerName: 'Alex', guess: 1.5, distance: 0, points: 1, isWinner: true }];
+    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, results: badResults, phaseEndAt: at }).success).toBe(false);
+  });
+
+  it('accepts a snapshot carrying an active-game payload and a null game', () => {
+    const lobby = {
+      code: 'ABCDEF',
+      status: 'active',
+      players: [{ id: UUID, name: 'Alex', joinOrder: 0, isHost: true, soundActivated: true, connected: true }],
+      canStart: false,
+    };
+    const game = {
+      phase: 'guess',
+      phaseEndAt: '2026-06-20T12:00:00.000Z',
+      round: { roundId: UUID, roundNo: 1, roundsTotal: 5, youtubeId: 'dQw4w9WgXcQ', clipStartSec: 43, clipEndSec: 53 },
+      standings: [{ playerName: 'Alex', totalPoints: 0, rank: 1 }],
+      yourGuess: null,
+      reveal: null,
+      rounds: [],
+    };
+    expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby, game }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby, game: null }).success).toBe(true);
   });
 });

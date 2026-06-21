@@ -1,8 +1,9 @@
-import { CREATE_RATE_LIMIT, JOIN_RATE_LIMIT, RATE_WINDOW_MS } from './constants.js';
+import { CREATE_RATE_LIMIT, GUESS_RATE_WINDOW_MS, GUESS_UPDATES_PER_SEC, JOIN_RATE_LIMIT, RATE_WINDOW_MS } from './constants.js';
 
-// In-memory per-IP sliding window. Create and join keep separate buckets so one cannot exhaust the
-// other's allowance. `now` is injectable so the window can be exercised deterministically in tests.
-type Bucket = 'join' | 'create';
+// In-memory sliding window. Each bucket keeps a separate allowance so one cannot exhaust another's; the
+// per-IP create/join buckets and the per-player guess bucket coexist here. `now` is injectable so the
+// window can be exercised deterministically in tests.
+type Bucket = 'join' | 'create' | 'guess';
 const hits = new Map<string, number[]>();
 
 // A one-off IP would otherwise leave its bucket in the map forever. Sweep fully-expired buckets every so
@@ -18,13 +19,14 @@ function sweepExpired(cutoff: number): void {
   }
 }
 
-function checkRateLimit(bucket: Bucket, ip: string, limit: number, now: number): boolean {
-  const cutoff = now - RATE_WINDOW_MS;
+function checkRateLimit(bucket: Bucket, id: string, limit: number, windowMs: number, now: number): boolean {
+  // Sweep on the widest window so a bucket is only GC'd once expired for every limiter sharing the map.
   if (++callsSinceSweep >= SWEEP_EVERY_CALLS) {
     callsSinceSweep = 0;
-    sweepExpired(cutoff);
+    sweepExpired(now - RATE_WINDOW_MS);
   }
-  const key = `${bucket}:${ip}`;
+  const cutoff = now - windowMs;
+  const key = `${bucket}:${id}`;
   const recent = (hits.get(key) ?? []).filter((t) => t > cutoff);
   if (recent.length >= limit) {
     hits.set(key, recent);
@@ -36,9 +38,13 @@ function checkRateLimit(bucket: Bucket, ip: string, limit: number, now: number):
 }
 
 export function checkJoinRateLimit(ip: string, now: number = Date.now()): boolean {
-  return checkRateLimit('join', ip, JOIN_RATE_LIMIT, now);
+  return checkRateLimit('join', ip, JOIN_RATE_LIMIT, RATE_WINDOW_MS, now);
 }
 
 export function checkCreateRateLimit(ip: string, now: number = Date.now()): boolean {
-  return checkRateLimit('create', ip, CREATE_RATE_LIMIT, now);
+  return checkRateLimit('create', ip, CREATE_RATE_LIMIT, RATE_WINDOW_MS, now);
+}
+
+export function checkGuessRateLimit(playerId: string, now: number = Date.now()): boolean {
+  return checkRateLimit('guess', playerId, GUESS_UPDATES_PER_SEC, GUESS_RATE_WINDOW_MS, now);
 }

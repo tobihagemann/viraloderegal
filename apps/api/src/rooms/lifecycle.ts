@@ -1,6 +1,7 @@
 import { RECONNECT_GRACE_SEC } from '@viraloderegal/shared';
 import { db } from '../db/kysely.js';
 import { connectedPlayerIds } from '../ws/registry.js';
+import { clearPhaseTimer, resumeScheduler } from './scheduler.js';
 import { withRoomLock } from './roomLock.js';
 import { broadcastLobby } from './snapshot.js';
 
@@ -23,7 +24,7 @@ export function cancelGraceTimer(playerId: string): void {
   }
 }
 
-function cancelAllGraceTimers(roomId: string): void {
+export function cancelAllGraceTimers(roomId: string): void {
   for (const [playerId, entry] of graceTimers) {
     if (entry.roomId === roomId) {
       clearTimeout(entry.timer);
@@ -83,7 +84,10 @@ export async function onPlayerDisconnected(playerId: string, roomId: string): Pr
     await assignHost(roomId, player.join_order, connected);
   }
   if (connected.size === 0) {
+    // The room just emptied: pause it. Grace timers and the phase scheduler both stop; the persisted
+    // disconnected_at and rounds.phase_end_at are the durable state until someone reconnects.
     cancelAllGraceTimers(roomId);
+    clearPhaseTimer(roomId);
   } else {
     startGraceTimer(playerId, roomId);
   }
@@ -96,6 +100,11 @@ async function expireGrace(playerId: string, roomId: string): Promise<void> {
   // The timer can fire while a reconnect is queued ahead of this on the room lock; clearTimeout no longer
   // helps once fired. The registry is the source of truth for "connected", so bail if they came back.
   if (connectedPlayerIds(roomId).has(playerId)) {
+    return;
+  }
+  // A grace timer that already fired can survive cancelAllGraceTimers when the room emptied; dropping the
+  // player now would break the paused room's "reconnectable until cleanup" contract. The room is durable.
+  if (connectedPlayerIds(roomId).size === 0) {
     return;
   }
   await db.transaction().execute(async (trx) => {
@@ -129,6 +138,9 @@ export async function resumeIfPaused(roomId: string, wasEmpty: boolean): Promise
       startGraceTimer(p.id, roomId);
     }
   }
+  // Restart the phase timer from the persisted phase_end_at if a game is mid-round. Lock-free: this runs
+  // under the caller's room lock, so it must not re-acquire it.
+  await resumeScheduler(roomId);
   const hostConnected = players.some((p) => p.is_host && connected.has(p.id));
   if (hostConnected) {
     return;

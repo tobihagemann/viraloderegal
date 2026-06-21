@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_GUESS, ROOM_STATUSES, ROUND_PHASES } from '../constants.js';
+import { roundScoreSchema, standingSchema } from '../scoring.js';
 import { gameSettingsSchema, roomCodeSchema } from './http.js';
 
 // Client → server commands. The server holds all authoritative state; clients only send commands.
@@ -31,6 +32,13 @@ export const skipIntermissionCommandSchema = z.object({
   type: z.literal('skipIntermission'),
 });
 
+// Host-originated: the authoritative host reports that a clip refused to embed or failed to play. roundId
+// names which round failed so a duplicate or stale report is ignored once that round has been replaced.
+export const reportClipFailureCommandSchema = z.object({
+  type: z.literal('reportClipFailure'),
+  roundId: z.uuid(),
+});
+
 export const kickCommandSchema = z.object({
   type: z.literal('kick'),
   playerId: z.uuid(),
@@ -52,6 +60,7 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
   startCommandSchema,
   guessCommandSchema,
   skipIntermissionCommandSchema,
+  reportClipFailureCommandSchema,
   kickCommandSchema,
   banCommandSchema,
   handBackHostCommandSchema,
@@ -63,6 +72,65 @@ export const phaseEventSchema = z.object({
   type: z.literal('phase'),
   phase: z.enum(ROUND_PHASES),
   phaseEndAt: z.iso.datetime(),
+});
+
+// The active round's metadata, shared by the round event and the reconnect snapshot. roundId is the id the
+// host echoes back in reportClipFailure to name the failed clip.
+export const activeRoundSchema = z.object({
+  roundId: z.uuid(),
+  roundNo: z.number().int(),
+  roundsTotal: z.number().int(),
+  youtubeId: z.string(),
+  clipStartSec: z.number().int(),
+  clipEndSec: z.number().int(),
+});
+
+// The round's true view count with each player's per-guess delta and the winner flag, shared by the reveal
+// event and the reconnect snapshot.
+export const revealPayloadSchema = z.object({
+  viewCount: z.number().int(),
+  results: z.array(roundScoreSchema),
+});
+
+// Broadcast at each round's clip start so clients play the segment; carries the round metadata and the
+// clip phase deadline. Non-clip transitions reuse phaseEventSchema.
+export const roundEventSchema = activeRoundSchema.extend({
+  type: z.literal('round'),
+  phase: z.literal('clip'),
+  phaseEndAt: z.iso.datetime(),
+});
+
+// The live reveal event: the reveal payload plus its phase deadline.
+export const revealEventSchema = revealPayloadSchema.extend({
+  type: z.literal('reveal'),
+  phaseEndAt: z.iso.datetime(),
+});
+
+// The cumulative standings shown on the reveal board between rounds.
+export const leaderboardEventSchema = z.object({
+  type: z.literal('leaderboard'),
+  standings: z.array(standingSchema),
+  phaseEndAt: z.iso.datetime(),
+});
+
+// A delivered round's result, carried in the end-screen history so late or removed clients can still
+// render the per-round table.
+export const roundResultSchema = revealPayloadSchema.extend({
+  roundNo: z.number().int(),
+});
+export type RoundResult = z.infer<typeof roundResultSchema>;
+
+// The end screen: final standings plus the per-round history.
+export const gameOverEventSchema = z.object({
+  type: z.literal('gameOver'),
+  standings: z.array(standingSchema),
+  rounds: z.array(roundResultSchema),
+});
+
+// The T-1-minute warning the cleanup sweep emits while players are present.
+export const roomWarningEventSchema = z.object({
+  type: z.literal('roomWarning'),
+  secondsRemaining: z.number().int(),
 });
 
 export const errorEventSchema = z.object({
@@ -91,11 +159,28 @@ export const lobbyStateSchema = z.object({
 });
 export type LobbyState = z.infer<typeof lobbyStateSchema>;
 
-// Full per-socket snapshot sent on (re)connect; `you` is the recipient's own player id.
+// The authoritative game state a reconnecting socket needs to resume mid-game or land on the end screen.
+// Null/absent while the room is still in the lobby. For an active game the phase/round/reveal fields are
+// populated; for a finished room they are null and only `standings` + `rounds` (the end-screen history)
+// carry data.
+export const gameSnapshotSchema = z.object({
+  phase: z.enum(ROUND_PHASES).nullable(),
+  phaseEndAt: z.iso.datetime().nullable(),
+  round: activeRoundSchema.nullable(),
+  standings: z.array(standingSchema),
+  yourGuess: z.number().int().nullable(),
+  reveal: revealPayloadSchema.nullable(),
+  rounds: z.array(roundResultSchema),
+});
+export type GameSnapshot = z.infer<typeof gameSnapshotSchema>;
+
+// Full per-socket snapshot sent on (re)connect; `you` is the recipient's own player id. `game` completes
+// the reconnect contract when a game is active or finished, and is absent in the lobby.
 export const snapshotEventSchema = z.object({
   type: z.literal('snapshot'),
   you: z.uuid(),
   lobby: lobbyStateSchema,
+  game: gameSnapshotSchema.nullable().optional(),
 });
 export type SnapshotEvent = z.infer<typeof snapshotEventSchema>;
 
@@ -113,5 +198,16 @@ export const kickedEventSchema = z.object({
 });
 export type KickedEvent = z.infer<typeof kickedEventSchema>;
 
-export const serverEventSchema = z.discriminatedUnion('type', [phaseEventSchema, errorEventSchema, snapshotEventSchema, lobbyEventSchema, kickedEventSchema]);
+export const serverEventSchema = z.discriminatedUnion('type', [
+  phaseEventSchema,
+  roundEventSchema,
+  revealEventSchema,
+  leaderboardEventSchema,
+  gameOverEventSchema,
+  roomWarningEventSchema,
+  errorEventSchema,
+  snapshotEventSchema,
+  lobbyEventSchema,
+  kickedEventSchema,
+]);
 export type ServerEvent = z.infer<typeof serverEventSchema>;

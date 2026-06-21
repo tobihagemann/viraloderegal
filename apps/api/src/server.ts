@@ -2,12 +2,15 @@ import { serve } from '@hono/node-server';
 import { app } from './app.js';
 import { closeDb } from './db/kysely.js';
 import { env } from './env.js';
+import { startCleanupSweep, stopCleanupSweep } from './rooms/cleanup.js';
 import { reconcileOnStartup } from './rooms/lifecycle.js';
+import { rehydrateSchedulers } from './rooms/scheduler.js';
 import { attachWebSocketHub } from './ws/hub.js';
 
 // Reconcile persisted presence before accepting traffic, otherwise a reconnect could clear disconnected_at
-// before the pass marks that row disconnected.
+// before the pass marks that row disconnected. Scheduler rehydration runs in the same pre-serve window.
 await reconcileOnStartup();
+await rehydrateSchedulers();
 
 // The Node HTTP server handle stays reachable so a WebSocketServer can attach to this same server.
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
@@ -15,9 +18,11 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 });
 
 attachWebSocketHub(server);
+startCleanupSweep();
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, async () => {
+    stopCleanupSweep();
     server.close();
     await closeDb();
     process.exit(0);
