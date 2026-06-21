@@ -23,6 +23,11 @@ export const gameSettingsSchema = z.object({
 });
 export type GameSettings = z.infer<typeof gameSettingsSchema>;
 
+export const createRoomRequestSchema = z.object({
+  name: z.string(),
+});
+export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
+
 export const createRoomResponseSchema = z.object({
   code: roomCodeSchema,
   sessionToken: z.string(),

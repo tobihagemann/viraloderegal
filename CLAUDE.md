@@ -30,4 +30,5 @@ CI runs one `quality` job — build → typecheck → lint → knip → Vitest �
 - **SPA ↔ API.** Same origin: in production the API serves the built SPA (`static.ts`, mounted only in production) and `/health` backs the container healthcheck; in dev Vite serves the SPA on a separate port.
 - **Shared contracts.** Cross-side values both client and server enforce (room-code alphabet, username rules, guess bound, clip-segment bounds, phase durations) live in `packages/shared` so the two cannot drift; server-only operational values live with the code that owns them.
 - **i18n / UI.** The UI is German, implemented i18n-ready (vue-i18n), responsive for Chrome desktop and mobile, on a `red-600`-family accent.
+- **Testing layers.** CI runs Vitest (`pnpm test`) _before_ `migrate`, so the schema is not applied during Vitest — keep Vitest DB-free (drive the app in-memory via `app.request()`, unit-test pure helpers). DB-backed coverage belongs in Playwright `e2e`, which runs after `migrate`.
 - **Supply chain.** Pin GitHub Actions to commit SHAs and the Docker base to a sha256 digest; don't revert to floating tags. Bumping is manual — no dependabot/renovate.

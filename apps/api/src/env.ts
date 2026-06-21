@@ -11,6 +11,13 @@ const DEV_DATABASE_URL = 'postgres://viraloderegal:viraloderegal@localhost:5432/
 const envSchema = z.object({
   DATABASE_URL: requiredInProd(DEV_DATABASE_URL),
   PORT: z.coerce.number().int().positive().default(3000),
+  // Trust X-Forwarded-For for the real client IP (rate-limit and ban keys). On only behind a proxy that
+  // populates the header (Traefik in production); off in dev so the socket peer is used. Never trust it
+  // unconditionally — an unproxied client could spoof the header.
+  TRUST_PROXY: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
   // Directory holding the built SPA (apps/web/dist) the API serves in production. Never read in dev
   // (Vite serves the SPA), so the default is a placeholder; the image sets the absolute path.
   WEB_DIST_DIR: requiredInProd('../web/dist'),

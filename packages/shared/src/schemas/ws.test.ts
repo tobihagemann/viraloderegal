@@ -29,6 +29,12 @@ describe('clientCommandSchema', () => {
     expect(clientCommandSchema.safeParse({ type: 'activateSound' }).success).toBe(true);
   });
 
+  it('routes the moderation and host commands', () => {
+    expect(clientCommandSchema.safeParse({ type: 'ban', playerId: UUID }).success).toBe(true);
+    expect(clientCommandSchema.safeParse({ type: 'handBackHost' }).success).toBe(true);
+    expect(clientCommandSchema.safeParse({ type: 'setName', name: 'Alex' }).success).toBe(true);
+  });
+
   it('rejects an unknown command type', () => {
     expect(clientCommandSchema.safeParse({ type: 'nope' }).success).toBe(false);
   });
@@ -45,5 +51,32 @@ describe('serverEventSchema', () => {
 
   it('accepts an error event with a code and message', () => {
     expect(serverEventSchema.safeParse({ type: 'error', code: 'room_full', message: 'Room is full' }).success).toBe(true);
+  });
+
+  it('accepts a snapshot event carrying the recipient id and a lobby state', () => {
+    const lobby = {
+      code: 'ABCDEF',
+      status: 'lobby',
+      players: [{ id: UUID, name: 'Alex', joinOrder: 0, isHost: true, soundActivated: false, connected: true }],
+      canStart: false,
+    };
+    expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'lobby', lobby }).success).toBe(true);
+  });
+
+  it('rejects a lobby event with a malformed roster entry', () => {
+    const lobby = {
+      code: 'ABCDEF',
+      status: 'lobby',
+      players: [{ id: 'not-a-uuid', name: 'Alex', joinOrder: 0, isHost: true, soundActivated: false, connected: true }],
+      canStart: false,
+    };
+    expect(serverEventSchema.safeParse({ type: 'lobby', lobby }).success).toBe(false);
+  });
+
+  it('accepts a kicked event only with a known reason', () => {
+    expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'kick' }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'ban' }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'kicked', reason: 'left' }).success).toBe(false);
   });
 });
