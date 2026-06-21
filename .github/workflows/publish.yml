@@ -47,6 +47,16 @@ jobs:
           DATABASE_URL=postgres://viraloderegal:viraloderegal@postgres:5432/viraloderegal
           NODE_ENV=production
           VIRALODEREGAL_IMAGE=viraloderegal:ci
+          BETTER_AUTH_SECRET=ci-smoke-better-auth-secret-0123456789
+          BETTER_AUTH_URL=http://localhost:3000
+          MAIL_TRANSPORT=json
+          SMTP_HOST=localhost
+          SMTP_PORT=587
+          SMTP_USER=viraloderegal
+          SMTP_PASSWORD=viraloderegal
+          SMTP_FROM=Viral oder Egal <noreply@viraloderegal.de>
+          BOOTSTRAP_ADMIN_EMAIL=admin@viraloderegal.de
+          BOOTSTRAP_ADMIN_PASSWORD=viraloderegal-bootstrap
           EOF
           # Tear the stack down even if the health wait or curl fails, so nothing is left running.
           trap 'docker compose -f docker-compose.prod.yml down -v' EXIT
