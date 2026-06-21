@@ -42,7 +42,7 @@ test('join is rate-limited after the per-IP window allowance', async ({ request 
   expect((await limited.json()).code).toBe('rate_limited');
 });
 
-test('the lobby broadcasts the roster and flips canStart once everyone has activated sound', async ({ request }) => {
+test('the lobby broadcasts the roster and opens the start gate once enough players are connected', async ({ request }) => {
   const host = await createRoom(request, 'Hanna', ip('10'));
 
   const hostWs = await openWs();
@@ -50,6 +50,8 @@ test('the lobby broadcasts the roster and flips canStart once everyone has activ
   const snapshot = await hostWs.nextOfType('snapshot');
   expect(snapshot.lobby.players).toHaveLength(1);
   expect(snapshot.you).toBe(snapshot.lobby.players[0].id);
+  // A lone player cannot start.
+  expect(snapshot.lobby.canStart).toBe(false);
 
   const guest = await request.post('/rooms/join', { data: { code: host.code, name: 'Guest' }, headers: ip('11') });
   expect(guest.status()).toBe(200);
@@ -59,19 +61,13 @@ test('the lobby broadcasts the roster and flips canStart once everyone has activ
   guestWs.send({ type: 'join', sessionToken: guestToken });
   await guestWs.nextOfType('snapshot');
 
-  // Host sees the guest join (after its own join broadcast, hence the wait for two players).
+  // Once the second player connects the start gate opens — sound activation is not required.
   let lobby = await hostWs.nextOfType('lobby');
-  while (lobby.lobby.players.length < 2) {
+  while (lobby.lobby.players.length < 2 || !lobby.lobby.canStart) {
     lobby = await hostWs.nextOfType('lobby');
   }
-  expect(lobby.lobby.canStart).toBe(false);
-
-  hostWs.send({ type: 'activateSound' });
-  guestWs.send({ type: 'activateSound' });
-  while (!lobby.lobby.canStart) {
-    lobby = await hostWs.nextOfType('lobby');
-  }
-  expect(lobby.lobby.players.every((p) => p.soundActivated)).toBe(true);
+  expect(lobby.lobby.players).toHaveLength(2);
+  expect(lobby.lobby.canStart).toBe(true);
 
   hostWs.close();
   guestWs.close();

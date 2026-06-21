@@ -250,3 +250,47 @@ test('a rematch from a finished room starts a fresh game whose leaderboard exclu
   host.close();
   guest.close();
 });
+
+test('the guess window ends early once every connected player commits a final guess', async ({ request }) => {
+  test.setTimeout(120_000);
+  // A long guess timer so a timer-driven advance would be far slower than the commit-driven early advance.
+  const { host, guest } = await readyRoom(request, '132', '133');
+  host.send({ type: 'start', settings: { source: 'random', roundsTotal: 3, guessTimerSec: 60 } });
+  const round = await host.nextOfType('round');
+  const guessPhase = await host.nextOfType('phase');
+  expect(guessPhase.phase).toBe('guess');
+  const guessDeadline = new Date(guessPhase.phaseEndAt).getTime();
+
+  // A draft guess does not ready a player; only a final one does.
+  host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId], final: true });
+  guest.send({ type: 'guess', value: 0, final: true });
+
+  // Both committed, so the reveal arrives well before the 60s guess timer would have fired.
+  const reveal = await host.nextOfType('reveal');
+  expect(reveal.viewCount).toBe(VIEW_COUNTS[round.youtubeId]);
+  expect(Date.now()).toBeLessThan(guessDeadline - 30_000);
+
+  host.close();
+  guest.close();
+});
+
+test('a draft guess does not ready a player, so the guess window runs to its timer', async ({ request }) => {
+  test.setTimeout(60_000);
+  const { host, guest } = await readyRoom(request, '134', '135');
+  host.send({ type: 'start', settings: { source: 'random', roundsTotal: 3, guessTimerSec: 15 } });
+  const round = await host.nextOfType('round');
+  const guessPhase = await host.nextOfType('phase');
+  expect(guessPhase.phase).toBe('guess');
+  const start = Date.now();
+
+  // The host commits, but the guest only drafts (no final). Not every connected player is ready, so the
+  // early advance must NOT fire — the window runs to its 15s timer rather than ending immediately.
+  host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId], final: true });
+  guest.send({ type: 'guess', value: 0 });
+
+  await host.nextOfType('reveal');
+  expect(Date.now() - start).toBeGreaterThan(12_000);
+
+  host.close();
+  guest.close();
+});

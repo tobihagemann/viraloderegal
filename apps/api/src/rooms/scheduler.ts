@@ -169,11 +169,30 @@ async function startGameLocked(roomId: string, hostId: string, settings: GameSet
 
 export type GuessResult = { ok: true } | { ok: false; error: 'window_closed' | 'rate_limited' };
 
-export function submitGuess(roomId: string, playerId: string, value: number): Promise<GuessResult> {
-  return withRoomLock(roomId, () => submitGuessLocked(roomId, playerId, value));
+export function submitGuess(roomId: string, playerId: string, value: number, final: boolean): Promise<GuessResult> {
+  return withRoomLock(roomId, () => submitGuessLocked(roomId, playerId, value, final));
 }
 
-async function submitGuessLocked(roomId: string, playerId: string, value: number): Promise<GuessResult> {
+// In-memory per-round readiness: a player becomes ready when they commit a final guess and un-ready again if
+// they keep editing (a draft). Once every connected player is ready the guess window ends early. Single
+// authoritative process, so this mirrors the existing in-memory phase timers; it is cleared when the round
+// leaves the guess phase.
+const readyByRound = new Map<string, Set<string>>();
+
+function setReady(roundId: string, playerId: string, ready: boolean): void {
+  if (ready) {
+    let set = readyByRound.get(roundId);
+    if (!set) {
+      set = new Set();
+      readyByRound.set(roundId, set);
+    }
+    set.add(playerId);
+  } else {
+    readyByRound.get(roundId)?.delete(playerId);
+  }
+}
+
+async function submitGuessLocked(roomId: string, playerId: string, value: number, final: boolean): Promise<GuessResult> {
   const round = await selectActiveRound(db, roomId);
   if (!round || round.currentPhase !== 'guess' || !round.phaseEndAt || Date.now() >= round.phaseEndAt.getTime()) {
     return { ok: false, error: 'window_closed' };
@@ -186,7 +205,32 @@ async function submitGuessLocked(roomId: string, playerId: string, value: number
     .values({ round_id: round.roundId, player_id: playerId, guess: value })
     .onConflict((oc) => oc.columns(['round_id', 'player_id']).doUpdateSet({ guess: value, updated_at: new Date() }))
     .execute();
+  setReady(round.roundId, playerId, final);
+  if (final) {
+    await advanceIfAllReady(roomId, round.roundId);
+  }
   return { ok: true };
+}
+
+// End the guess window early once every connected player has committed — the same lock-free advance the
+// intermission skip uses. Disconnected players cannot commit, so they are not awaited (a fully-empty room is
+// already paused and never reaches here).
+async function advanceIfAllReady(roomId: string, roundId: string): Promise<void> {
+  const connected = connectedPlayerIds(roomId);
+  if (connected.size === 0) {
+    return;
+  }
+  const ready = readyByRound.get(roundId);
+  if (!ready) {
+    return;
+  }
+  for (const playerId of connected) {
+    if (!ready.has(playerId)) {
+      return;
+    }
+  }
+  clearPhaseTimer(roomId);
+  await advancePhaseLocked(roomId, roundId, 'guess');
 }
 
 export type SkipResult = { ok: true } | { ok: false; error: 'not_host' | 'not_intermission' };
@@ -271,6 +315,7 @@ async function advancePhaseLocked(roomId: string, expectedRoundId: string, expec
     // Scoring is written inside this same transaction so a crash cannot leave the phase advanced without
     // scores, or scores without the advance.
     if (expectedPhase === 'guess') {
+      readyByRound.delete(round.roundId);
       await scoreAndPersist(trx, round, roomId);
     }
     const advance = nextPhase(expectedPhase);

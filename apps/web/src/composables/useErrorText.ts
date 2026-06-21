@@ -1,0 +1,19 @@
+import { useI18n } from 'vue-i18n';
+
+// Resolve a server or validation error code to a localized message, trying the error and usernameError
+// namespaces before falling back to a generic message. Codes arrive as plain strings (REST bodies, ws error
+// events), so the lookup is dynamic and the typed t/te are widened here at the single boundary.
+export function useErrorText() {
+  const { t, te } = useI18n();
+  const translate = t as (key: string) => string;
+  const exists = te as (key: string) => boolean;
+  return (code: string): string => {
+    for (const namespace of ['error', 'usernameError']) {
+      const key = `${namespace}.${code}`;
+      if (exists(key)) {
+        return translate(key);
+      }
+    }
+    return translate('error.generic');
+  };
+}

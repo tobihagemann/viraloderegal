@@ -12,7 +12,7 @@
     "build": "pnpm -r build",
     "test": "pnpm --filter @viraloderegal/shared build && pnpm -r test",
     "typecheck": "pnpm --filter @viraloderegal/shared build && pnpm -r typecheck",
-    "e2e": "pnpm --filter @viraloderegal/api build && playwright test",
+    "e2e": "pnpm --filter @viraloderegal/api build && pnpm --filter @viraloderegal/web build && playwright test",
     "lint": "eslint .",
     "knip": "knip",
     "format": "prettier --write .",

@@ -30,10 +30,11 @@ export const ROUNDS_TOTAL_OPTIONS = [3, 5, 7, 9] as const;
 export const DEFAULT_ROUNDS_TOTAL = 5;
 export type RoundsTotal = (typeof ROUNDS_TOTAL_OPTIONS)[number];
 
-/** Reveal sub-phase and pacing durations in seconds. */
-export const REVEAL_STING_SEC = 6;
-export const REVEAL_GUESSES_SEC = 4;
-export const REVEAL_BOARD_SEC = 2;
+/** Reveal sub-phase and pacing durations in seconds: a brief suspense sting, then longer windows to read
+ * the per-guess results and the updated leaderboard. */
+export const REVEAL_STING_SEC = 3;
+export const REVEAL_GUESSES_SEC = 8;
+export const REVEAL_BOARD_SEC = 5;
 export const INTERMISSION_SEC = 30;
 
 /** Reconnect grace window in seconds before a dropped player is removed. */

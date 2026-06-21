@@ -16,7 +16,7 @@ interface PlayerRow {
 }
 
 // Pure: maps rows to the lobby view and computes the start-gate. No DB access so it is unit-testable.
-// canStart requires at least MIN_PLAYERS connected and every connected player sound-activated.
+// canStart requires at least MIN_PLAYERS connected; sound is a per-client preference, not a start gate.
 export function computeLobbyState(room: RoomRow, players: PlayerRow[], connectedIds: Set<string>): LobbyState {
   const roster: Player[] = [...players]
     .sort((a, b) => a.join_order - b.join_order)
@@ -29,7 +29,7 @@ export function computeLobbyState(room: RoomRow, players: PlayerRow[], connected
       connected: connectedIds.has(p.id),
     }));
   const connected = roster.filter((p) => p.connected);
-  const canStart = connected.length >= MIN_PLAYERS && connected.every((p) => p.soundActivated);
+  const canStart = connected.length >= MIN_PLAYERS;
   return { code: room.code, status: room.status, players: roster, canStart };
 }
 

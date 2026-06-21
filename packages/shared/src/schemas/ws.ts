@@ -23,9 +23,12 @@ export const startCommandSchema = z.object({
   settings: gameSettingsSchema,
 });
 
+// A guess is sent live as the player types (draft) and once more when they commit it (final). A final guess
+// marks the player ready; the server ends the window early once every connected player is ready.
 export const guessCommandSchema = z.object({
   type: z.literal('guess'),
   value: z.number().int().min(0).max(MAX_GUESS),
+  final: z.boolean().optional(),
 });
 
 export const skipIntermissionCommandSchema = z.object({

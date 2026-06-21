@@ -24,7 +24,7 @@ export interface WsClient {
 }
 
 export async function openWs(): Promise<WsClient> {
-  const socket = new WebSocket('ws://localhost:3000');
+  const socket = new WebSocket(`ws://localhost:${process.env.E2E_PORT ?? '3000'}`);
   const queue: ServerEvent[] = [];
   const waiters: ((msg: ServerEvent) => void)[] = [];
   socket.addEventListener('message', (ev) => {

@@ -23,13 +23,8 @@ describe('computeLobbyState', () => {
     expect(computeLobbyState(room, players, connected).canStart).toBe(false);
   });
 
-  it('cannot start while a connected player has not activated sound', () => {
-    const players = [player('a', 0, true), player('b', 1, false)];
-    expect(computeLobbyState(room, players, new Set(['a', 'b'])).canStart).toBe(false);
-  });
-
-  it('can start when enough connected players have all activated sound', () => {
-    const players = [player('a', 0, true), player('b', 1, true)];
+  it('can start once enough players are connected, regardless of sound activation', () => {
+    const players = [player('a', 0, false), player('b', 1, false)];
     expect(computeLobbyState(room, players, new Set(['a', 'b'])).canStart).toBe(true);
   });
 });

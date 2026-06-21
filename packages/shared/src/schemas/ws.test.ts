@@ -14,6 +14,12 @@ describe('guessCommandSchema', () => {
     expect(guessCommandSchema.safeParse({ type: 'guess', value: -1 }).success).toBe(false);
     expect(guessCommandSchema.safeParse({ type: 'guess', value: 1.5 }).success).toBe(false);
   });
+
+  it('treats final as an optional boolean', () => {
+    expect(guessCommandSchema.safeParse({ type: 'guess', value: 1, final: true }).success).toBe(true);
+    expect(guessCommandSchema.safeParse({ type: 'guess', value: 1 }).success).toBe(true);
+    expect(guessCommandSchema.safeParse({ type: 'guess', value: 1, final: 'yes' }).success).toBe(false);
+  });
 });
 
 describe('kickCommandSchema', () => {

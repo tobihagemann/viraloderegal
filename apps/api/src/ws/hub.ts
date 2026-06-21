@@ -199,7 +199,7 @@ async function dispatch(session: Session, playerId: string, roomId: string, comm
       return;
     }
     case 'guess': {
-      const result = await submitGuess(roomId, playerId, command.value);
+      const result = await submitGuess(roomId, playerId, command.value, command.final ?? false);
       if (!result.ok) {
         sendError(session.socket, result.error, 'Guess rejected');
       }
