@@ -13,6 +13,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/rooms': { target: 'http://localhost:3000', changeOrigin: true },
+      '/api/auth': { target: 'http://localhost:3000', changeOrigin: true },
+      '/admin/invites': { target: 'http://localhost:3000', changeOrigin: true },
       '/ws': { target: 'http://localhost:3000', ws: true, changeOrigin: true },
     },
   },

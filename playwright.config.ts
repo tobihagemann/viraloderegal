@@ -24,13 +24,25 @@ export default defineConfig({
     // Production mode makes DATABASE_URL required (no dev fallback), so set it explicitly — preserving CI's
     // override while letting a bare local checkout reach the dev Compose stack. WEB_DIST_DIR resolves
     // against the repo-root cwd. Trust X-Forwarded-For so specs can isolate per-IP rate-limit and ban
-    // buckets via the header.
+    // buckets via the header. Production also makes the admin-auth/SMTP/bootstrap vars required, so supply
+    // them; MAIL_TRANSPORT=json keeps the invite flow offline (no mail server) and the bootstrap admin
+    // credentials drive the auth specs.
     env: {
       NODE_ENV: 'production',
       PORT: port,
       TRUST_PROXY: '1',
       WEB_DIST_DIR: 'apps/web/dist',
       DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal',
+      BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789-abcdef',
+      BETTER_AUTH_URL: `http://localhost:${port}`,
+      MAIL_TRANSPORT: 'json',
+      SMTP_HOST: 'localhost',
+      SMTP_PORT: '587',
+      SMTP_USER: 'viraloderegal',
+      SMTP_PASSWORD: 'viraloderegal',
+      SMTP_FROM: 'Viral oder Egal <noreply@viraloderegal.de>',
+      BOOTSTRAP_ADMIN_EMAIL: 'admin@viraloderegal.de',
+      BOOTSTRAP_ADMIN_PASSWORD: 'bootstrap-admin-password',
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

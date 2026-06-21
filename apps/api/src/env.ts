@@ -7,6 +7,9 @@ export const isProduction = process.env.NODE_ENV === 'production';
 const requiredInProd = (devDefault: string) => (isProduction ? z.string().min(1) : z.string().min(1).default(devDefault));
 
 const DEV_DATABASE_URL = 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal';
+// better-auth documents a high-entropy ≥32-char secret. The dev default must itself be ≥32 chars or this
+// module throws at import (reddening Vitest, which loads the app before migrate).
+const DEV_BETTER_AUTH_SECRET = 'dev-better-auth-secret-change-me-0123456789';
 
 const envSchema = z.object({
   DATABASE_URL: requiredInProd(DEV_DATABASE_URL),
@@ -21,14 +24,24 @@ const envSchema = z.object({
   // Directory holding the built SPA (apps/web/dist) the API serves in production. Never read in dev
   // (Vite serves the SPA), so the default is a placeholder; the image sets the absolute path.
   WEB_DIST_DIR: requiredInProd('../web/dist'),
-  // Optional so the API boots without them; tighten to required when auth/curation use them.
+  // Optional so the API boots without it; tighten to required when curation uses it.
   YOUTUBE_API_KEY: z.string().min(1).optional(),
-  BETTER_AUTH_SECRET: z.string().min(1).optional(),
-  SMTP_HOST: z.string().min(1).optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional(),
-  SMTP_USER: z.string().min(1).optional(),
-  SMTP_PASSWORD: z.string().min(1).optional(),
-  SMTP_FROM: z.string().min(1).optional(),
+  // Admin auth (better-auth) + invite email. Required in prod; dev/test fall back to working placeholders so
+  // a bare checkout still boots. The secret must be ≥32 chars per better-auth.
+  BETTER_AUTH_SECRET: isProduction ? z.string().min(32) : z.string().min(32).default(DEV_BETTER_AUTH_SECRET),
+  // Base URL better-auth uses to build invite/callback links.
+  BETTER_AUTH_URL: requiredInProd('http://localhost:3000'),
+  SMTP_HOST: requiredInProd('localhost'),
+  SMTP_PORT: isProduction ? z.coerce.number().int().positive() : z.coerce.number().int().positive().default(587),
+  SMTP_USER: requiredInProd('viraloderegal'),
+  SMTP_PASSWORD: requiredInProd('viraloderegal'),
+  SMTP_FROM: requiredInProd('Viral oder Egal <noreply@viraloderegal.de>'),
+  // `json` swaps the SMTP transport for nodemailer's offline jsonTransport (no network); used by e2e so the
+  // invite flow runs without a mail server. Defaults to real SMTP, so production is unaffected.
+  MAIL_TRANSPORT: z.enum(['smtp', 'json']).default('smtp'),
+  // Seeded at deploy time so the first admin can sign in and invite the rest.
+  BOOTSTRAP_ADMIN_EMAIL: requiredInProd('admin@viraloderegal.de'),
+  BOOTSTRAP_ADMIN_PASSWORD: requiredInProd('viraloderegal'),
 });
 
 const parsed = envSchema.safeParse(process.env);

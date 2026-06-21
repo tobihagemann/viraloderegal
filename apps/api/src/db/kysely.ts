@@ -122,7 +122,8 @@ export type DB = {
 };
 
 // pg.Pool connects lazily (first query), so constructing it at module load lets /health boot without a reachable database.
-const pool = new Pool({ connectionString: env.DATABASE_URL });
+// Exported so the auth layer reuses this single Pool (the API is the only DB client).
+export const pool = new Pool({ connectionString: env.DATABASE_URL });
 
 export const db = new Kysely<DB>({
   dialect: new PostgresDialect({ pool }),

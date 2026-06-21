@@ -102,6 +102,37 @@ export const de = {
   connection: {
     reconnecting: 'Verbindung unterbrochen – neuer Versuch …',
   },
+  adminLogin: {
+    heading: 'Adminbereich',
+    subtitle: 'Melde dich an, um Inhalte zu verwalten.',
+    emailLabel: 'E-Mail',
+    emailPlaceholder: "admin{'@'}viraloderegal.de",
+    passwordLabel: 'Passwort',
+    submit: 'Anmelden',
+  },
+  adminInvite: {
+    heading: 'Einladung annehmen',
+    subtitle: 'Lege ein Passwort fest, um dem Adminbereich beizutreten.',
+    passwordLabel: 'Passwort',
+    passwordHint: 'Mindestens 8 Zeichen.',
+    submit: 'Passwort festlegen und beitreten',
+  },
+  admin: {
+    heading: 'Adminbereich',
+    greeting: 'Angemeldet als {email}',
+    signOut: 'Abmelden',
+    inviteHeading: 'Kollegin oder Kollegen einladen',
+    inviteEmailLabel: 'E-Mail',
+    inviteEmailPlaceholder: "kollege{'@'}viraloderegal.de",
+    inviteSubmit: 'Einladung senden',
+    inviteSent: 'Einladung an {email} gesendet.',
+  },
+  adminError: {
+    invalid_credentials: 'E-Mail oder Passwort ist falsch.',
+    invalid_invitation: 'Diese Einladung ist ungültig oder abgelaufen.',
+    accept_failed: 'Die Einladung konnte nicht angenommen werden. Bitte versuche es erneut.',
+    invite_failed: 'Die Einladung konnte nicht gesendet werden. Bitte versuche es erneut.',
+  },
   usernameError: {
     empty: 'Bitte gib einen Namen ein.',
     invalid_chars: 'Nur Buchstaben, Zahlen, Leerzeichen, _ und - sind erlaubt.',

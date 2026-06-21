@@ -13,7 +13,7 @@ import {
   validateUsername,
 } from '@viraloderegal/shared';
 import { storeSessionToken } from '../composables/useStorage.js';
-import { useErrorText } from '../composables/useErrorText.js';
+import { errorCode, useErrorText } from '../composables/useErrorText.js';
 
 const router = useRouter();
 const route = useRoute();
@@ -65,12 +65,6 @@ async function postJson(path: string, body: unknown): Promise<{ status: number; 
   });
   const data = await response.json().catch(() => null);
   return { status: response.status, data };
-}
-
-function errorCode(data: unknown): string {
-  return typeof data === 'object' && data !== null && 'code' in data && typeof (data as { code: unknown }).code === 'string'
-    ? (data as { code: string }).code
-    : 'generic';
 }
 
 async function onCreate(): Promise<void> {
