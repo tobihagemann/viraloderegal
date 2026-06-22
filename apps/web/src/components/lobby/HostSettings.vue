@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { DEFAULT_GUESS_TIMER_SEC, DEFAULT_ROUNDS_TOTAL, GUESS_TIMER_OPTIONS_SEC, ROUNDS_TOTAL_OPTIONS, gameSettingsSchema } from '@viraloderegal/shared';
+import {
+  type CuratedSetSummary,
+  DEFAULT_GUESS_TIMER_SEC,
+  DEFAULT_ROUNDS_TOTAL,
+  GUESS_TIMER_OPTIONS_SEC,
+  ROUNDS_TOTAL_OPTIONS,
+  gameSettingsSchema,
+} from '@viraloderegal/shared';
 import { useGameState } from '../../composables/useGameState.js';
 import { useConnection } from '../../composables/useConnection.js';
 import SettingsSelect from './SettingsSelect.vue';
@@ -17,20 +24,40 @@ const startLabel = computed(() => props.startLabel ?? t('settings.start'));
 
 const rounds = ref(String(DEFAULT_ROUNDS_TOTAL));
 const timer = ref(String(DEFAULT_GUESS_TIMER_SEC));
+// The source select carries 'random' or a curated set's id. Sets come from the public, enabled-and-ready list.
+const source = ref('random');
+const sets = ref<CuratedSetSummary[]>([]);
 
 const roundOptions = ROUNDS_TOTAL_OPTIONS.map((value) => ({ value: String(value), label: String(value) }));
 const timerOptions = GUESS_TIMER_OPTIONS_SEC.map((value) => ({ value: String(value), label: `${value} ${t('common.seconds')}` }));
+const sourceOptions = computed(() => [
+  { value: 'random', label: t('settings.sourceRandom') },
+  ...sets.value.map((set) => ({ value: set.id, label: set.name })),
+]);
+const isSet = computed(() => source.value !== 'random');
 
-// Phase 1 only supports the random source; the server rejects any other with invalid_source.
 const canStart = computed(() => store.lobby?.canStart ?? false);
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/sets');
+    if (res.ok) {
+      sets.value = (await res.json()) as CuratedSetSummary[];
+    }
+  } catch {
+    // A failed set fetch leaves the random pool available; the host just sees no curated options.
+  }
+});
 
 function start(): void {
   if (!canStart.value) return;
-  const settings = gameSettingsSchema.parse({
-    source: 'random',
-    roundsTotal: Number(rounds.value),
-    guessTimerSec: Number(timer.value),
-  });
+  // A set start sends a placeholder roundsTotal (required by the schema); the server derives the real round
+  // count from the set length. A random start sends the chosen round count and no set id.
+  const settings = gameSettingsSchema.parse(
+    isSet.value
+      ? { source: 'set', curatedSetId: source.value, roundsTotal: DEFAULT_ROUNDS_TOTAL, guessTimerSec: Number(timer.value) }
+      : { source: 'random', roundsTotal: Number(rounds.value), guessTimerSec: Number(timer.value) },
+  );
   send({ type: 'start', settings });
 }
 </script>
@@ -41,16 +68,16 @@ function start(): void {
 
     <div class="grid gap-4 sm:grid-cols-3">
       <div class="flex flex-col gap-1.5">
+        <p class="text-sm font-medium text-neutral-700">{{ t('settings.source') }}</p>
+        <SettingsSelect v-model="source" :options="sourceOptions" :label="t('settings.source')" />
+      </div>
+      <div v-if="!isSet" class="flex flex-col gap-1.5">
         <p class="text-sm font-medium text-neutral-700">{{ t('settings.rounds') }}</p>
         <SettingsSelect v-model="rounds" :options="roundOptions" :label="t('settings.rounds')" />
       </div>
       <div class="flex flex-col gap-1.5">
         <p class="text-sm font-medium text-neutral-700">{{ t('settings.timer') }}</p>
         <SettingsSelect v-model="timer" :options="timerOptions" :label="t('settings.timer')" />
-      </div>
-      <div class="flex flex-col gap-1.5">
-        <p class="text-sm font-medium text-neutral-700">{{ t('settings.source') }}</p>
-        <p class="flex items-center rounded-lg bg-neutral-50 px-3 py-2.5 text-base text-neutral-500 sm:py-2 sm:text-sm">{{ t('settings.sourceRandom') }}</p>
       </div>
     </div>
 

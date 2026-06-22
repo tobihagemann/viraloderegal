@@ -40,6 +40,9 @@ export const INTERMISSION_SEC = 30;
 /** Reconnect grace window in seconds before a dropped player is removed. */
 export const RECONNECT_GRACE_SEC = 45;
 
+/** A YouTube video id is always 11 characters; mirrored by the videos table's varchar(11) columns. */
+export const YOUTUBE_ID_LENGTH = 11;
+
 /**
  * Clip-segment bounds in seconds. The admin "Clip testen" preview validates
  * client-side and the videos CHECK constraint enforces server-side.

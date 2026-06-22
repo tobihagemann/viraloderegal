@@ -4,8 +4,11 @@ import { TRUSTED_IP_HEADER } from './auth/ip.js';
 import { isProduction } from './env.js';
 import { clientIp } from './rooms/clientIp.js';
 import { adminInvites } from './routes/adminInvites.js';
+import { adminSets } from './routes/adminSets.js';
+import { adminVideos } from './routes/adminVideos.js';
 import { health } from './routes/health.js';
 import { rooms } from './routes/rooms.js';
+import { sets } from './routes/sets.js';
 import { registerStatic } from './static.js';
 
 export const app = new Hono();
@@ -14,6 +17,12 @@ export const app = new Hono();
 app.route('/health', health);
 app.route('/rooms', rooms);
 app.route('/admin/invites', adminInvites);
+// Curation lives under /api so it never shadows the SPA's own /admin/videos and /admin/sets document routes
+// (an API GET on those paths would otherwise win over the SPA fallback on a refresh/deep-link). The set list
+// is public (host start menu); the CRUD modules each front their own routes with requireAdmin.
+app.route('/api/sets', sets);
+app.route('/api/admin/videos', adminVideos);
+app.route('/api/admin/sets', adminSets);
 // better-auth owns everything under its base path; mount it ahead of the SPA fallback so its routes win. Hand
 // it the app-resolved trusted client IP on a dedicated header so its rate limiter can't be fooled by a spoofed
 // X-Forwarded-For. Always drop any inbound value for that header first so a client can never supply its own,

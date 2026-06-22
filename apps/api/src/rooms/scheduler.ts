@@ -1,6 +1,7 @@
 import {
   type GameSettings,
   type GameSnapshot,
+  type GameSource,
   type PlayerGuess,
   type RoundPhase,
   type RoundResult,
@@ -11,7 +12,11 @@ import {
   scoreRound,
 } from '@viraloderegal/shared';
 import { type Kysely, type Transaction, sql } from 'kysely';
+import { findUnreadyVideos } from '../curation/setReadiness.js';
+import { loadVideoStates } from '../curation/videoStates.js';
 import { type DB, db } from '../db/kysely.js';
+import { fetchViewCount, isQuotaExhausted } from '../youtube/client.js';
+import { isSnapshotFresh } from '../youtube/freshness.js';
 import { broadcast, connectedPlayerIds } from '../ws/registry.js';
 import { buildLobbyState } from './snapshot.js';
 import { checkGuessRateLimit } from './ratelimit.js';
@@ -39,17 +44,27 @@ interface ActiveRound {
   phaseEndAt: Date | null;
   guessTimerSec: number;
   roundsTotal: number;
+  source: GameSource;
+  curatedSetId: string | null;
 }
 
+// A pool-eligible video as selected from the DB, before the loop-time freshness resolve. snapshotRefreshedAt
+// drives whether the stored view count is reused or refreshed.
+interface VideoCandidate {
+  youtubeId: string;
+  clipStartSec: number;
+  clipEndSec: number;
+  viewCount: number;
+  snapshotRefreshedAt: Date | null;
+}
+
+// A candidate after the freshness resolve: the view count is the one beginClipRound persists onto the round.
 interface SelectedVideo {
   youtubeId: string;
   clipStartSec: number;
   clipEndSec: number;
   viewCount: number;
 }
-
-// Thrown to roll back a game-start transaction when the random pool is exhausted (returning would commit).
-class NoVideosError extends Error {}
 
 // The reveal numbers become public when the guesses are revealed; the sting before them is still suspense.
 const REVEAL_VISIBLE_PHASES: RoundPhase[] = ['reveal_guesses', 'reveal_board', 'inter'];
@@ -88,7 +103,7 @@ function applyOutcome(roomId: string, outcome: Outcome): void {
   }
 }
 
-export type StartError = 'not_host' | 'not_startable' | 'already_active' | 'invalid_source' | 'not_ready' | 'no_videos';
+export type StartError = 'not_host' | 'not_startable' | 'already_active' | 'invalid_source' | 'set_not_ready' | 'not_ready' | 'no_videos';
 export type StartResult = { ok: true } | { ok: false; error: StartError };
 
 // First game or rematch. Self-locks (the hub calls this unwrapped) so it shares the per-room critical
@@ -98,11 +113,6 @@ export function startGame(roomId: string, hostId: string, settings: GameSettings
 }
 
 async function startGameLocked(roomId: string, hostId: string, settings: GameSettings): Promise<StartResult> {
-  // Fail closed: the curated-set source is not wired yet, so a game persisted as set-backed but populated
-  // from the random pool would write inconsistent state.
-  if (settings.source !== 'random') {
-    return { ok: false, error: 'invalid_source' };
-  }
   const room = await db.selectFrom('rooms').select('status').where('id', '=', roomId).executeTakeFirst();
   if (!room) {
     return { ok: false, error: 'not_startable' };
@@ -124,47 +134,76 @@ async function startGameLocked(roomId: string, hostId: string, settings: GameSet
     return { ok: false, error: 'not_ready' };
   }
 
-  let outcome: Outcome;
-  try {
-    outcome = await db.transaction().execute(async (trx): Promise<Outcome> => {
-      // game_no is monotonic per room; the per-room lock serializes rematch so max + 1 cannot race. The
-      // games_room_id_game_no_key constraint remains the backstop.
-      const max = await trx
-        .selectFrom('games')
-        .select((eb) => eb.fn.max('game_no').as('maxNo'))
-        .where('room_id', '=', roomId)
-        .executeTakeFirst();
-      const game = await trx
-        .insertInto('games')
-        .values({
-          room_id: roomId,
-          game_no: (max?.maxNo ?? 0) + 1,
-          source: 'random',
-          curated_set_id: null,
-          rounds_total: settings.roundsTotal,
-          guess_timer_sec: settings.guessTimerSec,
-          active_round_id: null,
-        })
-        .returning('id')
-        .executeTakeFirstOrThrow();
-      const video = await selectRandomVideo(trx, game.id);
-      // Throw to roll back the games insert: returning normally would commit it, leaving an orphan game
-      // and burning a game_no on a start that never began.
-      if (!video) {
-        throw new NoVideosError();
-      }
-      const round = await beginClipRound(trx, game.id, 1, settings.roundsTotal, video);
-      await trx.updateTable('rooms').set({ active_game_id: game.id, status: 'active' }).where('id', '=', roomId).execute();
-      return round.outcome;
-    });
-  } catch (err) {
-    if (err instanceof NoVideosError) {
-      return { ok: false, error: 'no_videos' };
+  // Resolve the source before touching the pool. A curated set must still exist, be enabled, and be ready
+  // (every member enabled with a snapshot) at start time — readiness is re-checked here, never trusted from
+  // the host's set list, because a member can be disabled or lose its snapshot between list and start. The
+  // round count for a set is the set length, overriding the placeholder roundsTotal the client sends.
+  let curatedSetId: string | null = null;
+  let roundsTotal = settings.roundsTotal;
+  if (settings.source === 'set') {
+    if (settings.curatedSetId === undefined) {
+      return { ok: false, error: 'invalid_source' };
     }
-    throw err;
+    const setLength = await readyCuratedSetLength(settings.curatedSetId);
+    if (setLength === 'missing') {
+      return { ok: false, error: 'invalid_source' };
+    }
+    if (setLength === 'unready') {
+      return { ok: false, error: 'set_not_ready' };
+    }
+    curatedSetId = settings.curatedSetId;
+    roundsTotal = setLength;
   }
+
+  // Select the first video and resolve its snapshot freshness BEFORE opening the transaction: the resolve may
+  // issue a bounded YouTube fetch, which must not run while a pooled connection holds a transaction open. No
+  // game exists yet, so the selection excludes nothing.
+  const candidate = curatedSetId !== null ? await selectCuratedVideo(db, null, curatedSetId) : await selectRandomVideo(db, null);
+  if (!candidate) {
+    return { ok: false, error: 'no_videos' };
+  }
+  const video = await resolveFreshSnapshot(candidate);
+
+  const outcome = await db.transaction().execute(async (trx): Promise<Outcome> => {
+    // game_no is monotonic per room; the per-room lock serializes rematch so max + 1 cannot race. The
+    // games_room_id_game_no_key constraint remains the backstop.
+    const max = await trx
+      .selectFrom('games')
+      .select((eb) => eb.fn.max('game_no').as('maxNo'))
+      .where('room_id', '=', roomId)
+      .executeTakeFirst();
+    const game = await trx
+      .insertInto('games')
+      .values({
+        room_id: roomId,
+        game_no: (max?.maxNo ?? 0) + 1,
+        source: settings.source,
+        curated_set_id: curatedSetId,
+        rounds_total: roundsTotal,
+        guess_timer_sec: settings.guessTimerSec,
+        active_round_id: null,
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const round = await beginClipRound(trx, game.id, 1, roundsTotal, video);
+    await trx.updateTable('rooms').set({ active_game_id: game.id, status: 'active' }).where('id', '=', roomId).execute();
+    return round.outcome;
+  });
   applyOutcome(roomId, outcome);
   return { ok: true };
+}
+
+// Re-validate a curated set at start time: it must exist, be enabled, and be ready (every member enabled with
+// a non-null snapshot). Returns the set length — the game's round count — when ready, or a rejection reason.
+async function readyCuratedSetLength(curatedSetId: string): Promise<number | 'missing' | 'unready'> {
+  const set = await db.selectFrom('curated_sets').select(['video_order', 'enabled']).where('id', '=', curatedSetId).executeTakeFirst();
+  if (!set || !set.enabled || set.video_order.length === 0) {
+    return 'missing';
+  }
+  if (findUnreadyVideos(set.video_order, await loadVideoStates(set.video_order)).length > 0) {
+    return 'unready';
+  }
+  return set.video_order.length;
 }
 
 export type GuessResult = { ok: true } | { ok: false; error: 'window_closed' | 'rate_limited' };
@@ -273,6 +312,13 @@ async function reportClipFailureLocked(roomId: string, playerId: string, roundId
   if (!active || active.roundId !== roundId || active.currentPhase !== 'clip') {
     return { ok: false, error: 'invalid_round' };
   }
+  // Pre-select the replacement before the transaction. The failing clip is still an active round here, so it
+  // stays excluded from the draw — the replacement is necessarily a different clip. The snapshot is used as
+  // stored (no freshness fetch): the clip is being replaced for embed reasons, not staleness, and skipping
+  // the fetch denies a host a way to force repeated YouTube calls by spamming failures. For a curated set the
+  // skipped clip counts as used, so a string of failures can exhaust the set and end the game before
+  // rounds_total — the same pool-exhaustion early end the random path has, and acceptable here.
+  const replacement = await prepareNextVideo(active, false);
   clearPhaseTimer(roomId);
   const outcome = await db.transaction().execute(async (trx): Promise<Outcome | null> => {
     const round = await selectActiveRound(trx, roomId);
@@ -280,11 +326,10 @@ async function reportClipFailureLocked(roomId: string, playerId: string, roundId
       return null;
     }
     await trx.updateTable('rounds').set({ state: 'skipped', round_no: null, phase_end_at: null }).where('id', '=', roundId).execute();
-    const video = await selectRandomVideo(trx, round.gameId);
-    if (!video) {
+    if (!replacement) {
       return finalizeGame(trx, round.gameId, roomId);
     }
-    const { outcome } = await beginClipRound(trx, round.gameId, round.roundNo, round.roundsTotal, video);
+    const { outcome } = await beginClipRound(trx, round.gameId, round.roundNo, round.roundsTotal, replacement);
     return outcome;
   });
   if (outcome) {
@@ -304,6 +349,24 @@ async function advancePhaseLocked(roomId: string, expectedRoundId: string, expec
   if (connectedPlayerIds(roomId).size === 0) {
     return;
   }
+  // When this advance ends the current round with rounds remaining, the next video's freshness resolve may
+  // hit the network, which must not run inside the transaction. Pre-select and resolve it here, under the
+  // room lock (so the state cannot change before the transaction re-reads it). `undefined` means this advance
+  // does not start a round; `null` means the source is exhausted and the game ends.
+  let preparedNext: SelectedVideo | null | undefined;
+  if (nextPhase(expectedPhase) === 'round_complete') {
+    const current = await selectActiveRound(db, roomId);
+    if (
+      current &&
+      current.roundId === expectedRoundId &&
+      current.currentPhase === expectedPhase &&
+      current.roundNo !== null &&
+      current.roundNo < current.roundsTotal
+    ) {
+      preparedNext = await prepareNextVideo(current);
+    }
+  }
+
   const outcome = await db.transaction().execute(async (trx): Promise<Outcome | null> => {
     const round = await selectActiveRound(trx, roomId);
     // CAS on round id + phase (not phase_end_at, which a timestamptz round-trip does not reliably preserve
@@ -320,10 +383,13 @@ async function advancePhaseLocked(roomId: string, expectedRoundId: string, expec
     }
     const advance = nextPhase(expectedPhase);
     if (advance === 'round_complete') {
-      if (round.roundNo !== null && round.roundNo < round.roundsTotal) {
-        return startNextRound(trx, round, roomId);
-      }
       await trx.updateTable('rounds').set({ state: 'completed', phase_end_at: null }).where('id', '=', round.roundId).execute();
+      // Begin the next round with the pre-resolved video; a null prepared video (final round, or the source
+      // exhausted after the freshness resolve gated a member out) ends the game instead.
+      if (round.roundNo !== null && round.roundNo < round.roundsTotal && preparedNext) {
+        const { outcome } = await beginClipRound(trx, round.gameId, round.roundNo + 1, round.roundsTotal, preparedNext);
+        return outcome;
+      }
       return finalizeGame(trx, round.gameId, roomId);
     }
     const durationSec = phaseDurationSec(advance, round.guessTimerSec, round.clipEndSec - round.clipStartSec);
@@ -377,15 +443,51 @@ async function beginClipRound(
   return { roundId: round.id, outcome: { events: [event], next: { roundId: round.id, phase: 'clip', delayMs } } };
 }
 
-async function startNextRound(trx: Transaction<DB>, round: ActiveRound, roomId: string): Promise<Outcome> {
-  await trx.updateTable('rounds').set({ state: 'completed', phase_end_at: null }).where('id', '=', round.roundId).execute();
-  const video = await selectRandomVideo(trx, round.gameId);
-  if (!video) {
-    return finalizeGame(trx, round.gameId, roomId);
+// Select the next video for a game and prepare it, both outside any transaction. Branches on the game's
+// persisted source: a curated game walks its set in order, a random game draws from the pool. Returns null
+// when the source is exhausted, which drives an early game end. `refreshSnapshot` runs the loop-time freshness
+// resolve (a possible YouTube fetch); the clip-failure replacement path passes false — it replaces a clip for
+// embed reasons, not staleness, and skipping the fetch there denies a host a way to force repeated API calls.
+async function prepareNextVideo(round: ActiveRound, refreshSnapshot = true): Promise<SelectedVideo | null> {
+  let candidate: VideoCandidate | null;
+  if (round.source === 'set') {
+    // A set game must never silently fall back to the random pool. If the set was deleted mid-game
+    // (curated_set_id is ON DELETE SET NULL), the source is exhausted and the game ends.
+    candidate = round.curatedSetId !== null ? await selectCuratedVideo(db, round.gameId, round.curatedSetId) : null;
+  } else {
+    candidate = await selectRandomVideo(db, round.gameId);
   }
-  const nextRoundNo = (round.roundNo ?? 0) + 1;
-  const { outcome } = await beginClipRound(trx, round.gameId, nextRoundNo, round.roundsTotal, video);
-  return outcome;
+  if (!candidate) {
+    return null;
+  }
+  return refreshSnapshot ? resolveFreshSnapshot(candidate) : storedSnapshot(candidate);
+}
+
+// The candidate's stored view count, with no refresh.
+function storedSnapshot(candidate: VideoCandidate): SelectedVideo {
+  return { youtubeId: candidate.youtubeId, clipStartSec: candidate.clipStartSec, clipEndSec: candidate.clipEndSec, viewCount: candidate.viewCount };
+}
+
+// Resolve a candidate's view count just before it begins a round. A snapshot within the freshness window is
+// used as-is; a stale one is refreshed via the YouTube client (sharing its quota short-circuit) and the new
+// value persisted. On a quota-exhausted state or any fetch error the stored snapshot is the fallback, so a
+// value always exists (selection already gated out videos with no snapshot).
+async function resolveFreshSnapshot(candidate: VideoCandidate): Promise<SelectedVideo> {
+  const base = storedSnapshot(candidate);
+  if (isSnapshotFresh(candidate.snapshotRefreshedAt, Date.now()) || isQuotaExhausted()) {
+    return base;
+  }
+  try {
+    const viewCount = await fetchViewCount(candidate.youtubeId);
+    await db
+      .updateTable('videos')
+      .set({ view_count_snapshot: viewCount, snapshot_refreshed_at: new Date() })
+      .where('youtube_id', '=', candidate.youtubeId)
+      .execute();
+    return { ...base, viewCount };
+  } catch {
+    return base;
+  }
 }
 
 async function finalizeGame(trx: Transaction<DB>, gameId: string, roomId: string): Promise<Outcome> {
@@ -480,24 +582,73 @@ function mapScores(rows: { player_name: string; guess: number | null; distance: 
 }
 
 // Draw a random eligible video the game has not used yet (skipped clips count as used so they are not
-// redrawn). Returns null when the pool is exhausted, which drives an early game end. Without a YouTube
-// client the snapshot refresh is unavailable, so this serves the existing view_count_snapshot and gates
-// out videos that have none.
-async function selectRandomVideo(ex: DbExecutor, gameId: string): Promise<SelectedVideo | null> {
-  const video = await ex
+// redrawn). gameId null means no game exists yet (start), so nothing is excluded. Returns null when the pool
+// is exhausted, which drives an early game end. The freshness resolve runs afterward (outside any
+// transaction); this gates out videos with no snapshot so a value always exists.
+async function selectRandomVideo(ex: DbExecutor, gameId: string | null): Promise<VideoCandidate | null> {
+  let query = ex
     .selectFrom('videos')
-    .select(['youtube_id', 'clip_start_sec', 'clip_end_sec', 'view_count_snapshot'])
+    .select(['youtube_id', 'clip_start_sec', 'clip_end_sec', 'view_count_snapshot', 'snapshot_refreshed_at'])
     .where('enabled', '=', true)
     .where('random_eligible', '=', true)
-    .where('view_count_snapshot', 'is not', null)
-    .where('youtube_id', 'not in', (eb) => eb.selectFrom('rounds').select('youtube_id').where('game_id', '=', gameId))
+    .where('view_count_snapshot', 'is not', null);
+  if (gameId !== null) {
+    query = query.where('youtube_id', 'not in', (eb) => eb.selectFrom('rounds').select('youtube_id').where('game_id', '=', gameId));
+  }
+  const video = await query
     .orderBy(sql`random()`)
     .limit(1)
     .executeTakeFirst();
   if (!video || video.view_count_snapshot === null) {
     return null;
   }
-  return { youtubeId: video.youtube_id, clipStartSec: video.clip_start_sec, clipEndSec: video.clip_end_sec, viewCount: video.view_count_snapshot };
+  return {
+    youtubeId: video.youtube_id,
+    clipStartSec: video.clip_start_sec,
+    clipEndSec: video.clip_end_sec,
+    viewCount: video.view_count_snapshot,
+    snapshotRefreshedAt: video.snapshot_refreshed_at,
+  };
+}
+
+// Walk a curated set's video_order and return the first member still eligible (enabled, non-null snapshot)
+// and not already used in this game (skipped rounds count as used, like the random path), preserving the
+// set's order. gameId null means start (nothing used yet). Returns null when the ordered walk is exhausted.
+async function selectCuratedVideo(ex: DbExecutor, gameId: string | null, curatedSetId: string): Promise<VideoCandidate | null> {
+  const set = await ex.selectFrom('curated_sets').select('video_order').where('id', '=', curatedSetId).executeTakeFirst();
+  if (!set || set.video_order.length === 0) {
+    return null;
+  }
+  const used =
+    gameId === null
+      ? new Set<string>()
+      : new Set((await ex.selectFrom('rounds').select('youtube_id').where('game_id', '=', gameId).execute()).map((row) => row.youtube_id));
+  // One query for every eligible member, then walk video_order in memory so the set's order is preserved
+  // without a round-trip per candidate (this runs under the room lock).
+  const eligible = await ex
+    .selectFrom('videos')
+    .select(['youtube_id', 'clip_start_sec', 'clip_end_sec', 'view_count_snapshot', 'snapshot_refreshed_at'])
+    .where('youtube_id', 'in', set.video_order)
+    .where('enabled', '=', true)
+    .where('view_count_snapshot', 'is not', null)
+    .execute();
+  const eligibleById = new Map(eligible.map((video) => [video.youtube_id, video]));
+  for (const youtubeId of set.video_order) {
+    if (used.has(youtubeId)) {
+      continue;
+    }
+    const video = eligibleById.get(youtubeId);
+    if (video && video.view_count_snapshot !== null) {
+      return {
+        youtubeId: video.youtube_id,
+        clipStartSec: video.clip_start_sec,
+        clipEndSec: video.clip_end_sec,
+        viewCount: video.view_count_snapshot,
+        snapshotRefreshedAt: video.snapshot_refreshed_at,
+      };
+    }
+  }
+  return null;
 }
 
 // The room's active round of its active game, or undefined in the lobby / when finished. The inner joins on
@@ -519,6 +670,8 @@ function selectActiveRound(ex: DbExecutor, roomId: string): Promise<ActiveRound 
       'rounds.phase_end_at as phaseEndAt',
       'games.guess_timer_sec as guessTimerSec',
       'games.rounds_total as roundsTotal',
+      'games.source as source',
+      'games.curated_set_id as curatedSetId',
     ])
     .where('rooms.id', '=', roomId)
     .where('games.status', '=', 'active')

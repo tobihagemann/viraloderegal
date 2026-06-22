@@ -60,6 +60,13 @@ async function onSignOut(): Promise<void> {
       <button type="button" class="btn btn-secondary" @click="onSignOut">{{ t('admin.signOut') }}</button>
     </div>
 
+    <nav class="flex flex-col gap-2">
+      <RouterLink :to="{ name: 'adminVideos' }" class="btn btn-secondary justify-between"
+        >{{ t('adminNav.videos') }}<span aria-hidden="true">→</span></RouterLink
+      >
+      <RouterLink :to="{ name: 'adminSets' }" class="btn btn-secondary justify-between">{{ t('adminNav.sets') }}<span aria-hidden="true">→</span></RouterLink>
+    </nav>
+
     <form class="flex flex-col gap-4" @submit.prevent="onInvite">
       <h2 class="text-lg font-medium">{{ t('admin.inviteHeading') }}</h2>
       <div>

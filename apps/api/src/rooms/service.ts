@@ -1,15 +1,9 @@
 import { MAX_PLAYERS, type UsernameError, validateUsername } from '@viraloderegal/shared';
+import { isUniqueViolation } from '../db/constraints.js';
 import { db } from '../db/kysely.js';
 import { generateRoomCode } from './codes.js';
 import { ROOM_CODE_MAX_ATTEMPTS } from './constants.js';
 import { generateSessionToken } from './tokens.js';
-
-// Postgres unique-violation (23505). The constraint name distinguishes a room-code clash (retry) from a
-// case-insensitive name clash (reported to the user).
-function isUniqueViolation(err: unknown, constraint: string): boolean {
-  const e = err as { code?: string; constraint?: string };
-  return e?.code === '23505' && e.constraint === constraint;
-}
 
 export type CreateRoomResult = { ok: true; code: string; sessionToken: string } | { ok: false; error: UsernameError };
 

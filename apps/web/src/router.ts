@@ -8,6 +8,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/room/:code', name: 'room', component: RoomView, props: true },
   { path: '/admin/login', name: 'adminLogin', component: () => import('./views/AdminLoginView.vue') },
   { path: '/admin', name: 'admin', component: () => import('./views/AdminView.vue'), meta: { requiresAuth: true } },
+  { path: '/admin/videos', name: 'adminVideos', component: () => import('./views/admin/AdminVideosView.vue'), meta: { requiresAuth: true } },
+  { path: '/admin/sets', name: 'adminSets', component: () => import('./views/admin/AdminSetsView.vue'), meta: { requiresAuth: true } },
   { path: '/admin/accept-invite/:invitationId', name: 'adminAcceptInvite', component: () => import('./views/AdminInviteAcceptView.vue'), props: true },
 ];
 

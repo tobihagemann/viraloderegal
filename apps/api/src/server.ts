@@ -6,6 +6,7 @@ import { env } from './env.js';
 import { startCleanupSweep, stopCleanupSweep } from './rooms/cleanup.js';
 import { reconcileOnStartup } from './rooms/lifecycle.js';
 import { rehydrateSchedulers } from './rooms/scheduler.js';
+import { startRefreshJob, stopRefreshJob } from './youtube/refreshJob.js';
 import { attachWebSocketHub } from './ws/hub.js';
 
 // Reconcile persisted presence before accepting traffic, otherwise a reconnect could clear disconnected_at
@@ -22,10 +23,12 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 
 attachWebSocketHub(server);
 startCleanupSweep();
+startRefreshJob();
 
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, async () => {
     stopCleanupSweep();
+    stopRefreshJob();
     server.close();
     await closeDb();
     process.exit(0);
