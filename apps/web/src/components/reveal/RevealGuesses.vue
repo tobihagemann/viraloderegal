@@ -25,6 +25,14 @@ const results = computed(() =>
     <PhaseHeader />
 
     <div class="text-center">
+      <div v-if="store.reveal?.title" class="mb-5 flex items-center justify-center gap-2">
+        <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-red-600 text-white">
+          <svg viewBox="0 0 24 24" class="size-4 fill-current" aria-hidden="true">
+            <path d="M8 5.14v13.72a.5.5 0 0 0 .77.42l10.29-6.86a.5.5 0 0 0 0-.84L8.77 4.72A.5.5 0 0 0 8 5.14Z" />
+          </svg>
+        </span>
+        <p class="text-lg font-semibold text-balance text-neutral-900 sm:text-xl">{{ store.reveal.title }}</p>
+      </div>
       <p class="text-sm font-medium text-neutral-500">{{ t('reveal.viewCount') }}</p>
       <p class="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{{ format(store.reveal?.viewCount ?? 0) }}</p>
     </div>

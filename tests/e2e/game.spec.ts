@@ -15,6 +15,20 @@ const VIEW_COUNTS: Record<string, number> = {
   fJ9rUzIMcZQ: 1_800_000_000,
 };
 
+// Seeded titles per youtubeId, mirrored as literals (the spec does not import API source). The title is part
+// of the revealed answer — withheld until the reveal — so the reveal event carries it while the round event
+// must not.
+const EXPECTED_TITLES: Record<string, string> = {
+  dQw4w9WgXcQ: 'Never Gonna Give You Up',
+  '9bZkp7q19f0': 'Gangnam Style',
+  kJQP7kiw5Fk: 'Despacito',
+  OPf0YbXqDm0: 'Uptown Funk',
+  JGwWNGJdvx8: 'Shape of You',
+  hT_nvWreIhg: 'Counting Stars',
+  CevxZvSJLk8: 'Roar',
+  fJ9rUzIMcZQ: 'Bohemian Rhapsody',
+};
+
 const GAME_SETTINGS = { source: 'random', roundsTotal: 3, guessTimerSec: 15 } as const;
 
 interface ReadyRoom {
@@ -66,6 +80,8 @@ test('a full game runs through clip, guess, reveal, leaderboard, and a final gam
     const round = await host.nextOfType('round');
     expect(round.roundNo).toBe(roundNo);
     expect(round.roundsTotal).toBe(3);
+    // Anti-cheat: the clip-phase round event must not carry the title, or players could look up the answer.
+    expect('title' in round).toBe(false);
 
     const guessPhase = await host.nextOfType('phase');
     expect(guessPhase.phase).toBe('guess');
@@ -81,6 +97,7 @@ test('a full game runs through clip, guess, reveal, leaderboard, and a final gam
 
     const reveal = await host.nextOfType('reveal');
     expect(reveal.viewCount).toBe(trueCount);
+    expect(reveal.title).toBe(EXPECTED_TITLES[round.youtubeId]);
     expect(reveal.results).toHaveLength(2);
     expect(reveal.results.filter((r) => r.isWinner)).toHaveLength(1);
     expect(reveal.results.find((r) => r.isWinner)?.playerName).toBe('Alice');
@@ -119,6 +136,9 @@ test('a full game runs through clip, guess, reveal, leaderboard, and a final gam
   ]);
   expect(over.rounds).toHaveLength(3);
   expect(over.rounds.map((r) => r.roundNo)).toEqual([1, 2, 3]);
+  // The title is decoupled from the end-screen history (it rides only the live reveal), so the gameOver
+  // round results must stay title-free even though they share the reveal payload's other fields.
+  expect(over.rounds.every((round) => !('title' in round))).toBe(true);
 
   host.close();
   guest.close();
@@ -187,6 +207,8 @@ test('a mid-game reconnect resyncs the player with the active game snapshot and 
   expect(snapshot.game?.phase).toBe('guess');
   expect(snapshot.game?.round?.roundId).toBe(round.roundId);
   expect(snapshot.game?.yourGuess).toBe(trueCount);
+  // Null reveal pre-reveal also withholds the title (it rides only the reveal payload), so a reconnecting
+  // player cannot read the answer during the guess window.
   expect(snapshot.game?.reveal).toBeNull();
 
   // The paused round resumes for the reconnected player: the guess window still closes into a reveal.

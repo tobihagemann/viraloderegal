@@ -37,6 +37,7 @@ interface ActiveRound {
   gameId: string;
   roundNo: number | null;
   youtubeId: string;
+  title: string | null;
   clipStartSec: number;
   clipEndSec: number;
   viewCount: number | null;
@@ -528,7 +529,7 @@ async function buildPhaseEvent(trx: Transaction<DB>, phase: RoundPhase, round: A
   const iso = phaseEndAt.toISOString();
   if (phase === 'reveal_guesses') {
     const results = mapScores(await selectRoundScores(trx, round.roundId));
-    return { type: 'reveal', viewCount: requireSnapshot(round.viewCount, round.roundId), results, phaseEndAt: iso };
+    return { type: 'reveal', viewCount: requireSnapshot(round.viewCount, round.roundId), title: round.title, results, phaseEndAt: iso };
   }
   if (phase === 'reveal_board') {
     return { type: 'leaderboard', standings: await buildLeaderboard(trx, round.gameId), phaseEndAt: iso };
@@ -654,15 +655,19 @@ async function selectCuratedVideo(ex: DbExecutor, gameId: string | null, curated
 // The room's active round of its active game, or undefined in the lobby / when finished. The inner joins on
 // active_game_id and active_round_id mean a returned round is always the game's current authoritative round.
 function selectActiveRound(ex: DbExecutor, roomId: string): Promise<ActiveRound | undefined> {
+  // Left join (not inner) so a round whose source video was deleted mid-game still resolves; title falls
+  // back to null when the video is gone.
   return ex
     .selectFrom('rooms')
     .innerJoin('games', 'games.id', 'rooms.active_game_id')
     .innerJoin('rounds', 'rounds.id', 'games.active_round_id')
+    .leftJoin('videos', 'videos.youtube_id', 'rounds.youtube_id')
     .select([
       'rounds.id as roundId',
       'rounds.game_id as gameId',
       'rounds.round_no as roundNo',
       'rounds.youtube_id as youtubeId',
+      'videos.title_snapshot as title',
       'rounds.clip_start_sec as clipStartSec',
       'rounds.clip_end_sec as clipEndSec',
       'rounds.view_count_snapshot as viewCount',
@@ -738,7 +743,7 @@ export async function buildGameSnapshot(roomId: string, playerId: string): Promi
   }
   const myGuess = await db.selectFrom('guesses').select('guess').where('round_id', '=', round.roundId).where('player_id', '=', playerId).executeTakeFirst();
   const reveal = REVEAL_VISIBLE_PHASES.includes(round.currentPhase)
-    ? { viewCount: requireSnapshot(round.viewCount, round.roundId), results: mapScores(await selectRoundScores(db, round.roundId)) }
+    ? { viewCount: requireSnapshot(round.viewCount, round.roundId), title: round.title, results: mapScores(await selectRoundScores(db, round.roundId)) }
     : null;
   // The round is scored before its public reveal, so withhold it from the standings until the reveal runs.
   const liveStandings = round.currentPhase === 'reveal_sting' ? await buildLeaderboard(db, game.id, round.roundId) : standings;

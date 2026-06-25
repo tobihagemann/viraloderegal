@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_GUESS } from '../constants.js';
-import { clientCommandSchema, guessCommandSchema, kickCommandSchema, serverEventSchema } from './ws.js';
+import { clientCommandSchema, guessCommandSchema, kickCommandSchema, revealPayloadSchema, roundResultSchema, serverEventSchema } from './ws.js';
 
 const UUID = '00000000-0000-4000-8000-000000000000';
 
@@ -109,7 +109,7 @@ describe('serverEventSchema', () => {
       }).success,
     ).toBe(true);
     const results = [{ playerName: 'Alex', guess: 100, distance: 30, points: 1, isWinner: true }];
-    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, results, phaseEndAt: at }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, title: 'Never Gonna Give You Up', results, phaseEndAt: at }).success).toBe(true);
     const standings = [{ playerName: 'Alex', totalPoints: 1, rank: 1 }];
     expect(serverEventSchema.safeParse({ type: 'leaderboard', standings, phaseEndAt: at }).success).toBe(true);
     expect(serverEventSchema.safeParse({ type: 'gameOver', standings, rounds: [{ roundNo: 1, viewCount: 130, results }] }).success).toBe(true);
@@ -132,7 +132,9 @@ describe('serverEventSchema', () => {
       }).success,
     ).toBe(false);
     const badResults = [{ playerName: 'Alex', guess: 1.5, distance: 0, points: 1, isWinner: true }];
-    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, results: badResults, phaseEndAt: at }).success).toBe(false);
+    expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, title: 'Never Gonna Give You Up', results: badResults, phaseEndAt: at }).success).toBe(
+      false,
+    );
   });
 
   it('accepts a snapshot carrying an active-game payload and a null game', () => {
@@ -153,5 +155,11 @@ describe('serverEventSchema', () => {
     };
     expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby, game }).success).toBe(true);
     expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby, game: null }).success).toBe(true);
+  });
+
+  it('requires title on the reveal payload but omits it from the round-result history', () => {
+    // The asymmetry is intentional: the reveal answer requires the title; the decoupled end-screen history omits it.
+    expect(revealPayloadSchema.safeParse({ viewCount: 130, results: [] }).success).toBe(false);
+    expect(roundResultSchema.safeParse({ roundNo: 1, viewCount: 130, results: [] }).success).toBe(true);
   });
 });

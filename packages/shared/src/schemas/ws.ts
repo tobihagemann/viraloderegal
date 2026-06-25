@@ -89,9 +89,12 @@ export const activeRoundSchema = z.object({
 });
 
 // The round's true view count with each player's per-guess delta and the winner flag, shared by the reveal
-// event and the reconnect snapshot.
+// event and the reconnect snapshot. The video's title is part of the revealed answer — withheld until the
+// reveal alongside the view count so it can't be looked up during guessing. Null when the source video
+// carries no title snapshot.
 export const revealPayloadSchema = z.object({
   viewCount: z.number().int(),
+  title: z.string().nullable(),
   results: z.array(roundScoreSchema),
 });
 
@@ -117,8 +120,9 @@ export const leaderboardEventSchema = z.object({
 });
 
 // A delivered round's result, carried in the end-screen history so late or removed clients can still
-// render the per-round table.
-export const roundResultSchema = revealPayloadSchema.extend({
+// render the per-round table. The reveal payload's title is omitted — the end-screen recap shows view
+// counts, not titles.
+export const roundResultSchema = revealPayloadSchema.omit({ title: true }).extend({
   roundNo: z.number().int(),
 });
 export type RoundResult = z.infer<typeof roundResultSchema>;

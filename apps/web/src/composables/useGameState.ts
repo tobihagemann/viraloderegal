@@ -120,7 +120,7 @@ function applyEvent(event: ServerEvent): void {
     case 'reveal':
       store.phase = 'reveal_guesses';
       store.phaseEndAt = event.phaseEndAt;
-      store.reveal = { viewCount: event.viewCount, results: event.results };
+      store.reveal = { viewCount: event.viewCount, title: event.title, results: event.results };
       return;
     case 'leaderboard':
       store.phase = 'reveal_board';
