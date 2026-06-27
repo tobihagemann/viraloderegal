@@ -3,7 +3,9 @@ import { type ClientCommand, clientCommandSchema, type ServerEvent } from '@vira
 import type { ServerType } from '@hono/node-server';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { db } from '../db/kysely.js';
-import { assignHost, cancelGraceTimer, handBackHost, onPlayerDisconnected, resumeIfPaused } from '../rooms/lifecycle.js';
+import { wsClientIp } from '../rooms/clientIp.js';
+import { assignHost, cancelGraceTimer, cancelJoinDeadline, handBackHost, onPlayerDisconnected, resumeIfPaused } from '../rooms/lifecycle.js';
+import { checkWsJoinRateLimit } from '../rooms/ratelimit.js';
 import { withRoomLock } from '../rooms/roomLock.js';
 import { buildGameSnapshot, reportClipFailure, skipIntermission, startGame, submitGuess } from '../rooms/scheduler.js';
 import { buildLobbyState, broadcastLobby } from '../rooms/snapshot.js';
@@ -21,13 +23,22 @@ interface Session {
   playerId: string | null;
   roomId: string | null;
   joining: boolean;
+  ip: string;
 }
 
 export function attachWebSocketHub(server: ServerType): void {
   // serve() runs over HTTP/1 here, so the handle is a node:http Server despite ServerType's http2 arm.
   const wss = new WebSocketServer({ server: server as Server, maxPayload: MAX_WS_PAYLOAD_BYTES });
-  wss.on('connection', (socket) => {
-    const session: Session = { socket, playerId: null, roomId: null, joining: false };
+  wss.on('connection', (socket, request) => {
+    // Resolve the client IP once at upgrade for the per-IP join limiter. Never let resolution throw out of
+    // this handler: fall back to a sentinel bucket key so an undeterminable IP is still rate-limited.
+    let ip: string;
+    try {
+      ip = wsClientIp(request);
+    } catch {
+      ip = 'unknown';
+    }
+    const session: Session = { socket, playerId: null, roomId: null, joining: false, ip };
     socket.on('message', (raw) => {
       void onMessage(session, raw);
     });
@@ -90,6 +101,13 @@ async function handleJoin(session: Session, sessionToken: string): Promise<void>
     sendError(session.socket, 'already_joined', 'This connection is already bound to a player');
     return;
   }
+  // Throttle the unauthenticated session_token lookup per IP — the REST /join route limits its own bucket,
+  // but reconnects flow through here, so this is a separate, more generous bucket (env.WS_JOIN_RATE_LIMIT).
+  if (!checkWsJoinRateLimit(session.ip)) {
+    sendError(session.socket, 'rate_limited', 'Too many join attempts');
+    session.socket.close();
+    return;
+  }
   session.joining = true;
   try {
     // Initial lookup only resolves the room (the lock key) and rejects an obviously bad token cheaply.
@@ -130,6 +148,7 @@ async function handleJoin(session: Session, sessionToken: string): Promise<void>
       session.playerId = player.id;
       session.roomId = player.room_id;
       cancelGraceTimer(player.id);
+      cancelJoinDeadline(player.id);
       if (previous && previous !== session.socket) {
         previous.close();
       }
@@ -230,6 +249,7 @@ async function finishRemoval(session: Session, roomId: string, targetId: string,
   const targetSocket = socketFor(targetId);
   removeConnection(targetId);
   cancelGraceTimer(targetId);
+  cancelJoinDeadline(targetId);
   if (result.wasHost) {
     await assignHost(roomId, result.formerJoinOrder, connectedPlayerIds(roomId));
   }

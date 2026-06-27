@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context } from 'hono';
 import { env } from '../env.js';
@@ -24,4 +25,14 @@ export function resolveClientIp(trustProxy: boolean, forwardedFor: string | unde
 
 export function clientIp(c: Context): string {
   return resolveClientIp(env.TRUST_PROXY, c.req.header('x-forwarded-for'), getConnInfo(c).remote.address);
+}
+
+// The x-forwarded-for header type allows an array; collapse it to the single comma-string node normally
+// produces so resolveClientIp reads the rightmost (trusted-proxy) entry uniformly across both shapes.
+export function normalizeForwardedFor(header: string | string[] | undefined): string | undefined {
+  return Array.isArray(header) ? header.join(', ') : header;
+}
+
+export function wsClientIp(req: IncomingMessage): string {
+  return resolveClientIp(env.TRUST_PROXY, normalizeForwardedFor(req.headers['x-forwarded-for']), req.socket.remoteAddress);
 }

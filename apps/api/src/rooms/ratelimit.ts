@@ -1,9 +1,10 @@
+import { env } from '../env.js';
 import { CREATE_RATE_LIMIT, GUESS_RATE_WINDOW_MS, GUESS_UPDATES_PER_SEC, JOIN_RATE_LIMIT, RATE_WINDOW_MS } from './constants.js';
 
 // In-memory sliding window. Each bucket keeps a separate allowance so one cannot exhaust another's; the
-// per-IP create/join buckets and the per-player guess bucket coexist here. `now` is injectable so the
+// per-IP create/join/wsjoin buckets and the per-player guess bucket coexist here. `now` is injectable so the
 // window can be exercised deterministically in tests.
-type Bucket = 'join' | 'create' | 'guess';
+type Bucket = 'join' | 'create' | 'guess' | 'wsjoin';
 const hits = new Map<string, number[]>();
 
 // A one-off IP would otherwise leave its bucket in the map forever. Sweep fully-expired buckets every so
@@ -43,6 +44,10 @@ export function checkJoinRateLimit(ip: string, now: number = Date.now()): boolea
 
 export function checkCreateRateLimit(ip: string, now: number = Date.now()): boolean {
   return checkRateLimit('create', ip, CREATE_RATE_LIMIT, RATE_WINDOW_MS, now);
+}
+
+export function checkWsJoinRateLimit(ip: string, now: number = Date.now()): boolean {
+  return checkRateLimit('wsjoin', ip, env.WS_JOIN_RATE_LIMIT, RATE_WINDOW_MS, now);
 }
 
 export function checkGuessRateLimit(playerId: string, now: number = Date.now()): boolean {

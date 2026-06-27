@@ -31,6 +31,9 @@ export default defineConfig({
       NODE_ENV: 'production',
       PORT: port,
       TRUST_PROXY: '1',
+      // The raw openWs() helper can't send X-Forwarded-For, so every raw-protocol ws upgrade shares the
+      // wsjoin:127.0.0.1 loopback bucket; raise the limit (not a disable) so a suite run never trips it.
+      WS_JOIN_RATE_LIMIT: '5000',
       WEB_DIST_DIR: 'apps/web/dist',
       DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal',
       BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789-abcdef',

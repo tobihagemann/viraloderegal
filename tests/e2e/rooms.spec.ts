@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { connect, createRoom, ip, openWs, waitForLobby } from './helpers.js';
 
-// Mirror the server's rate limits; kept as literals so the spec does not import API source.
+// Mirror server constants; kept as literals so the spec does not import API source.
 const JOIN_RATE_LIMIT = 10;
 const CREATE_RATE_LIMIT = 5;
+const JOIN_DEADLINE_MS = 15_000;
 
 test('create returns a six-character code and a session token', async ({ request }) => {
   const room = await createRoom(request, 'Alice', ip('1'));
@@ -321,6 +322,74 @@ test('the original host can take the role back after a transfer', async ({ reque
 
   hostBack.ws.close();
   guestConn.ws.close();
+});
+
+test('a never-connected REST-joined seat is reclaimed after the join deadline, but a bound seat survives', async ({ request }) => {
+  // The server reclaims a REST-joined seat ~15s after join if no socket binds, so allow ample margin.
+  test.setTimeout(60_000);
+  const host = await createRoom(request, 'Keeper', ip('100'));
+
+  // Fill the remaining nine seats via REST without opening their sockets — each is a never-connected ghost
+  // whose deadline starts ticking at join. The host's own created seat has no deadline. Keep one joiner's
+  // token so it can bind a socket below and prove a bound seat is spared from reclaim.
+  let stayerToken = '';
+  for (let i = 1; i <= 9; i++) {
+    const res = await request.post('/rooms/join', { data: { code: host.code, name: `Ghost${i}` }, headers: ip(`10${i}`) });
+    expect(res.status()).toBe(200);
+    if (i === 1) {
+      stayerToken = (await res.json()).sessionToken;
+    }
+  }
+  // The room is full while the ghosts hold their seats.
+  const full = await request.post('/rooms/join', { data: { code: host.code, name: 'TooMany' }, headers: ip('110') });
+  expect(full.status()).toBe(409);
+  expect((await full.json()).code).toBe('room_full');
+
+  // Connect the host and one joiner within the deadline. Both bind broadcasts reflect the full room
+  // (length 10); a connected host keeps the room in the lobby (not abandoned), and binding a socket cancels
+  // that seat's deadline — so the reclaim must drop only the eight never-connected ghosts.
+  const hostConn = await connect(host.sessionToken);
+  const stayerConn = await connect(stayerToken);
+
+  // Once the deadline elapses the eight never-connected seats are reclaimed, leaving the host and the bound
+  // joiner — the only length-2 state, never satisfiable by either bind broadcast.
+  const lobby = await waitForLobby(hostConn.ws, (l) => l.players.length === 2);
+  const ids = lobby.players.map((p) => p.id);
+  expect(ids).toContain(hostConn.playerId);
+  expect(ids).toContain(stayerConn.playerId);
+
+  // The freed capacity now admits a new player where the full room rejected one moments earlier.
+  const rejoin = await request.post('/rooms/join', { data: { code: host.code, name: 'Latecomer' }, headers: ip('111') });
+  expect(rejoin.status()).toBe(200);
+
+  stayerConn.ws.close();
+  hostConn.ws.close();
+});
+
+test('a never-connected seat is reclaimed even when no socket is connected', async ({ request }) => {
+  // The reclaim must fire on the deadline even when nobody is connected — reclaimNeverConnected deliberately
+  // has no empty-room bail (unlike grace expiry, which preserves a paused room). With no socket to observe a
+  // broadcast, drive it via REST: a full room of never-connected ghosts must free up after the deadline.
+  test.setTimeout(60_000);
+  const host = await createRoom(request, 'Absent', ip('200'));
+
+  // Fill every remaining seat with never-connected ghosts and open no socket at all, so connectedPlayerIds
+  // is empty when each deadline fires. The host's created seat has no deadline, keeping the room in the lobby.
+  for (let i = 1; i <= 9; i++) {
+    const res = await request.post('/rooms/join', { data: { code: host.code, name: `Absent${i}` }, headers: ip(`20${i}`) });
+    expect(res.status()).toBe(200);
+  }
+  const full = await request.post('/rooms/join', { data: { code: host.code, name: 'TooMany' }, headers: ip('210') });
+  expect(full.status()).toBe(409);
+  expect((await full.json()).code).toBe('room_full');
+
+  // Wait past the deadline with zero connections, then confirm the ghost seats were reclaimed: a join that
+  // was room_full now succeeds.
+  await new Promise((resolve) => {
+    setTimeout(resolve, JOIN_DEADLINE_MS + 2_000);
+  });
+  const rejoin = await request.post('/rooms/join', { data: { code: host.code, name: 'Latecomer' }, headers: ip('211') });
+  expect(rejoin.status()).toBe(200);
 });
 
 test('joining a full room is rejected', async ({ request }) => {

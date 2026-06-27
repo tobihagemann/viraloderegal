@@ -1,6 +1,8 @@
 import { RECONNECT_GRACE_SEC } from '@viraloderegal/shared';
-import { db } from '../db/kysely.js';
+import type { Transaction } from 'kysely';
+import { type DB, db } from '../db/kysely.js';
 import { connectedPlayerIds } from '../ws/registry.js';
+import { JOIN_DEADLINE_SEC } from './constants.js';
 import { clearPhaseTimer, resumeScheduler } from './scheduler.js';
 import { withRoomLock } from './roomLock.js';
 import { broadcastLobby } from './snapshot.js';
@@ -29,6 +31,35 @@ export function cancelAllGraceTimers(roomId: string): void {
     if (entry.roomId === roomId) {
       clearTimeout(entry.timer);
       graceTimers.delete(playerId);
+    }
+  }
+}
+
+// Connect-deadline timers keyed by playerId, deliberately separate from graceTimers so a room-wide pause
+// (cancelAllGraceTimers) cannot cancel a pending deadline — a never-connected ghost still gets reclaimed.
+const joinDeadlineTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; roomId: string }>();
+
+export function armJoinDeadline(playerId: string, roomId: string): void {
+  cancelJoinDeadline(playerId);
+  const timer = setTimeout(() => {
+    void withRoomLock(roomId, () => reclaimNeverConnected(playerId, roomId));
+  }, JOIN_DEADLINE_SEC * 1000);
+  joinDeadlineTimers.set(playerId, { timer, roomId });
+}
+
+export function cancelJoinDeadline(playerId: string): void {
+  const entry = joinDeadlineTimers.get(playerId);
+  if (entry) {
+    clearTimeout(entry.timer);
+    joinDeadlineTimers.delete(playerId);
+  }
+}
+
+export function cancelAllJoinDeadlines(roomId: string): void {
+  for (const [playerId, entry] of joinDeadlineTimers) {
+    if (entry.roomId === roomId) {
+      clearTimeout(entry.timer);
+      joinDeadlineTimers.delete(playerId);
     }
   }
 }
@@ -94,6 +125,15 @@ export async function onPlayerDisconnected(playerId: string, roomId: string): Pr
   await broadcastLobby(roomId);
 }
 
+// Caller must already hold the room row FOR UPDATE; this helper does not lock the room itself.
+async function deletePlayerAbandoningIfEmpty(trx: Transaction<DB>, playerId: string, roomId: string): Promise<void> {
+  await trx.deleteFrom('players').where('id', '=', playerId).execute();
+  const remaining = await trx.selectFrom('players').select('id').where('room_id', '=', roomId).execute();
+  if (remaining.length === 0) {
+    await trx.updateTable('rooms').set({ status: 'abandoned' }).where('id', '=', roomId).execute();
+  }
+}
+
 // Grace elapsed: drop the player (freeing the name and seat). If that emptied the room, mark it abandoned.
 async function expireGrace(playerId: string, roomId: string): Promise<void> {
   graceTimers.delete(playerId);
@@ -111,13 +151,36 @@ async function expireGrace(playerId: string, roomId: string): Promise<void> {
     // Lock the room row so a concurrent REST join (which also takes it FOR UPDATE) cannot insert a player
     // between the empty check and the abandoned write, which would abandon a room that just gained a seat.
     await trx.selectFrom('rooms').select('id').where('id', '=', roomId).forUpdate().execute();
-    await trx.deleteFrom('players').where('id', '=', playerId).execute();
-    const remaining = await trx.selectFrom('players').select('id').where('room_id', '=', roomId).execute();
-    if (remaining.length === 0) {
-      await trx.updateTable('rooms').set({ status: 'abandoned' }).where('id', '=', roomId).execute();
-    }
+    await deletePlayerAbandoningIfEmpty(trx, playerId, roomId);
   });
   await broadcastLobby(roomId);
+}
+
+// A connect-deadline fired: the player REST-joined but never opened a socket, so reclaim the seat it holds.
+// Only ever armed at REST join and cancelled on the first bind, so this only ever runs for never-connected
+// ghosts — it therefore reclaims even a lone ghost in an otherwise-empty room (no empty-room bail).
+async function reclaimNeverConnected(playerId: string, roomId: string): Promise<void> {
+  joinDeadlineTimers.delete(playerId);
+  // The timer can fire while a bind is queued ahead of this on the room lock; the registry is the source of
+  // truth for "connected", so bail if they connected (the cancel raced).
+  if (connectedPlayerIds(roomId).has(playerId)) {
+    return;
+  }
+  // A fired deadline can queue behind cleanup's processRoom, which deletes the room and releases the lock
+  // before this runs. Re-read the room under the lock and bail if it is gone, so the post-transaction
+  // broadcast never hits buildLobbyState's executeTakeFirstOrThrow on a missing room (which would reject out
+  // of the void withRoomLock and crash the process).
+  const roomExisted = await db.transaction().execute(async (trx) => {
+    const room = await trx.selectFrom('rooms').select('id').where('id', '=', roomId).forUpdate().executeTakeFirst();
+    if (!room) {
+      return false;
+    }
+    await deletePlayerAbandoningIfEmpty(trx, playerId, roomId);
+    return true;
+  });
+  if (roomExisted) {
+    await broadcastLobby(roomId);
+  }
 }
 
 // First reconnect into a fully-paused room: restart grace timers for the players still disconnected and,

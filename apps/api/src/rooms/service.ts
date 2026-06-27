@@ -46,7 +46,7 @@ export async function createRoom({ name, ip }: { name: string; ip: string }): Pr
 }
 
 export type JoinRoomError = UsernameError | 'not_found' | 'not_joinable' | 'banned' | 'room_full' | 'name_taken';
-export type JoinRoomResult = { ok: true; sessionToken: string } | { ok: false; error: JoinRoomError };
+export type JoinRoomResult = { ok: true; sessionToken: string; playerId: string; roomId: string } | { ok: false; error: JoinRoomError };
 
 export async function joinRoom({ code, name, ip }: { code: string; name: string; ip: string }): Promise<JoinRoomResult> {
   const validation = validateUsername(name);
@@ -75,7 +75,7 @@ export async function joinRoom({ code, name, ip }: { code: string; name: string;
         return { ok: false, error: 'room_full' };
       }
       const nextOrder = players.reduce((max, p) => Math.max(max, p.join_order), -1) + 1;
-      await trx
+      const inserted = await trx
         .insertInto('players')
         .values({
           room_id: room.id,
@@ -86,8 +86,9 @@ export async function joinRoom({ code, name, ip }: { code: string; name: string;
           sound_activated: false,
           disconnected_at: null,
         })
-        .execute();
-      return { ok: true, sessionToken };
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      return { ok: true, sessionToken, playerId: inserted.id, roomId: room.id };
     });
     return result;
   } catch (err) {

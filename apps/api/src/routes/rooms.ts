@@ -2,6 +2,7 @@ import { type CreateRoomResponse, createRoomRequestSchema, type JoinRoomResponse
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { clientIp } from '../rooms/clientIp.js';
+import { armJoinDeadline } from '../rooms/lifecycle.js';
 import { checkCreateRateLimit, checkJoinRateLimit } from '../rooms/ratelimit.js';
 import { createRoom, type JoinRoomError, joinRoom } from '../rooms/service.js';
 
@@ -47,5 +48,8 @@ export const rooms = new Hono()
     if (!result.ok) {
       return c.json({ code: result.error }, JOIN_ERROR_STATUS[result.error]);
     }
+    // Reclaim the seat if no socket binds in time. Armed before responding so it is race-free: the client
+    // cannot open a ws until it receives the session token below, by which point the deadline is pending.
+    armJoinDeadline(result.playerId, result.roomId);
     return c.json({ sessionToken: result.sessionToken } satisfies JoinRoomResponse, 200);
   });

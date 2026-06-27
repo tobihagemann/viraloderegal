@@ -1,7 +1,7 @@
 import { db } from '../db/kysely.js';
 import { broadcast, connectedPlayerIds, removeConnection, socketFor } from '../ws/registry.js';
 import { CLEANUP_SWEEP_INTERVAL_MS, ROOM_LIFETIME_MS, ROOM_WARNING_LEAD_MS } from './constants.js';
-import { cancelAllGraceTimers } from './lifecycle.js';
+import { cancelAllGraceTimers, cancelAllJoinDeadlines } from './lifecycle.js';
 import { withRoomLock } from './roomLock.js';
 import { clearPhaseTimer } from './scheduler.js';
 
@@ -56,6 +56,7 @@ async function processRoom(roomId: string, now: number): Promise<void> {
   if (age >= ROOM_LIFETIME_MS || room.status === 'abandoned') {
     clearPhaseTimer(roomId);
     cancelAllGraceTimers(roomId);
+    cancelAllJoinDeadlines(roomId);
     // Evict any live sockets before the cascade delete: a connection left in the registry would otherwise
     // run later commands/closes against deleted rows. onClose no-ops once the registry entry is gone.
     for (const playerId of connectedPlayerIds(roomId)) {

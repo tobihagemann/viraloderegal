@@ -14,6 +14,9 @@ const DEV_BETTER_AUTH_SECRET = 'dev-better-auth-secret-change-me-0123456789';
 const envSchema = z.object({
   DATABASE_URL: requiredInProd(DEV_DATABASE_URL),
   PORT: z.coerce.number().int().positive().default(3000),
+  // Per-IP ws-join allowance per RATE_WINDOW_MS, more generous than the REST join bucket so a flaky-network
+  // player reconnecting to their own game is never locked out. Env-overridable so the e2e harness can raise it.
+  WS_JOIN_RATE_LIMIT: z.coerce.number().int().positive().default(30),
   // Trust X-Forwarded-For for the real client IP (rate-limit and ban keys). On only behind a proxy that
   // populates the header (Traefik in production); off in dev so the socket peer is used. Never trust it
   // unconditionally — an unproxied client could spoof the header.
