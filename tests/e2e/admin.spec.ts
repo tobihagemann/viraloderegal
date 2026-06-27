@@ -38,8 +38,10 @@ test('the bootstrap admin signs in and reaches the workspace', async ({ browser 
   await page.getByLabel('Passwort').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Anmelden' }).click();
 
+  // The SPA redirects to /admin only after the CPU-bound better-auth sign-in POST resolves, which can
+  // exceed Playwright's 5s default under CI load.
+  await expect(page.getByText(`Angemeldet als ${ADMIN_EMAIL}`)).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByText(`Angemeldet als ${ADMIN_EMAIL}`)).toBeVisible();
 
   await context.close();
 });
@@ -96,8 +98,8 @@ test('an invited admin sets a password on first login and reaches the workspace'
   await page.getByLabel('Passwort').fill('invited-password');
   await page.getByRole('button', { name: 'Passwort festlegen und beitreten' }).click();
 
+  await expect(page.getByText(`Angemeldet als ${invitee}`)).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByText(`Angemeldet als ${invitee}`)).toBeVisible();
 
   await context.close();
 });

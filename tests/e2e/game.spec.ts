@@ -59,8 +59,10 @@ async function playToGameOver(host: WsClient, guest: WsClient, rounds: number): 
   for (let roundNo = 1; roundNo <= rounds; roundNo++) {
     const round = await host.nextOfType('round');
     await host.nextOfType('phase');
-    host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId] });
-    guest.send({ type: 'guess', value: 0 });
+    // Commit final guesses so the guess window ends on the early-advance instead of running its full timer,
+    // keeping the multi-round run well under the test budget.
+    host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId], final: true });
+    guest.send({ type: 'guess', value: 0, final: true });
     await host.nextOfType('reveal');
     await host.nextOfType('leaderboard');
     const interPhase = await host.nextOfType('phase');
@@ -262,8 +264,8 @@ test('a rematch from a finished room starts a fresh game whose leaderboard exclu
   const round = await host.nextOfType('round');
   expect(round.roundNo).toBe(1);
   await host.nextOfType('phase');
-  host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId] });
-  guest.send({ type: 'guess', value: 0 });
+  host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId], final: true });
+  guest.send({ type: 'guess', value: 0, final: true });
   await host.nextOfType('reveal');
   const leaderboard = await host.nextOfType('leaderboard');
   // Only the single rematch round counts: Alice has 1, not 4.
