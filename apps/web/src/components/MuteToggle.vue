@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { SwitchRoot, SwitchThumb } from 'reka-ui';
+import { SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { useMute } from '../composables/useMute.js';
 
@@ -18,18 +19,8 @@ const soundOn = computed({
 
 <template>
   <div class="flex items-center gap-2">
-    <svg viewBox="0 0 16 16" class="size-4 shrink-0 fill-current text-neutral-500" aria-hidden="true">
-      <template v-if="soundOn">
-        <path
-          d="M7.557 2.066A.75.75 0 0 1 8 2.75v10.5a.75.75 0 0 1-1.248.56L3.59 11H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.59l3.162-2.81a.75.75 0 0 1 .805-.124ZM12.95 3.05a.75.75 0 1 0-1.06 1.06 5.5 5.5 0 0 1 0 7.78.75.75 0 1 0 1.06 1.06 7 7 0 0 0 0-9.9Z"
-        />
-        <path d="M10.828 5.172a.75.75 0 1 0-1.06 1.06 2.5 2.5 0 0 1 0 3.536.75.75 0 1 0 1.06 1.06 4 4 0 0 0 0-5.656Z" />
-      </template>
-      <path
-        v-else
-        d="M7.557 2.066A.75.75 0 0 1 8 2.75v10.5a.75.75 0 0 1-1.248.56L3.59 11H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1.59l3.162-2.81a.75.75 0 0 1 .805-.124ZM11.28 5.72a.75.75 0 1 0-1.06 1.06L11.44 8l-1.22 1.22a.75.75 0 1 0 1.06 1.06l1.22-1.22 1.22 1.22a.75.75 0 1 0 1.06-1.06L13.56 8l1.22-1.22a.75.75 0 0 0-1.06-1.06L12.5 6.94l-1.22-1.22Z"
-      />
-    </svg>
+    <SpeakerWaveIcon v-if="soundOn" class="size-4 shrink-0 text-neutral-500" />
+    <SpeakerXMarkIcon v-else class="size-4 shrink-0 text-neutral-500" />
     <SwitchRoot
       v-model="soundOn"
       :aria-label="soundOn ? t('mute.mute') : t('mute.unmute')"

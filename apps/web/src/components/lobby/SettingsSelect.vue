@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { SelectContent, SelectItem, SelectItemIndicator, SelectItemText, SelectPortal, SelectRoot, SelectTrigger, SelectValue, SelectViewport } from 'reka-ui';
+import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/16/solid';
 
 defineProps<{ modelValue: string; options: { value: string; label: string }[]; label: string }>();
 defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -9,9 +10,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
   <SelectRoot :model-value="modelValue" @update:model-value="$emit('update:modelValue', String($event))">
     <SelectTrigger :aria-label="label" class="field flex items-center justify-between gap-2 text-left">
       <SelectValue />
-      <svg viewBox="0 0 8 5" width="8" height="5" fill="none" class="shrink-0" aria-hidden="true">
-        <path d="M.5.5 4 4 7.5.5" class="stroke-neutral-500" />
-      </svg>
+      <ChevronDownIcon class="size-4 shrink-0 text-neutral-500" />
     </SelectTrigger>
     <SelectPortal>
       <SelectContent
@@ -28,9 +27,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
           >
             <SelectItemText>{{ option.label }}</SelectItemText>
             <SelectItemIndicator>
-              <svg viewBox="0 0 14 14" width="14" height="14" fill="none" class="size-3.5 shrink-0" aria-hidden="true">
-                <path d="M3 8L6 11L11 3.5" class="stroke-red-600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
+              <CheckIcon class="size-4 shrink-0 text-red-600" />
             </SelectItemIndicator>
           </SelectItem>
         </SelectViewport>

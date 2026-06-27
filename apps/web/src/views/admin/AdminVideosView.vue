@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { ArrowPathIcon, PencilSquareIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { CLIP_MAX_DURATION_SEC, CLIP_MIN_DURATION_SEC, YOUTUBE_ID_LENGTH } from '@viraloderegal/shared';
 import { errorCode, useErrorText } from '../../composables/useErrorText.js';
 import ClipPreview from '../../components/admin/ClipPreview.vue';
+import SearchField from '../../components/admin/SearchField.vue';
 
 interface VideoRow {
   youtubeId: string;
@@ -224,7 +226,7 @@ onMounted(() => {
 
     <section class="card flex flex-col gap-4">
       <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="runSearch">
-        <input v-model="search" type="search" :placeholder="t('adminVideos.searchPlaceholder')" class="field" />
+        <SearchField v-model="search" :placeholder="t('adminVideos.searchPlaceholder')" />
         <button type="submit" class="btn btn-secondary sm:w-auto">{{ t('adminVideos.search') }}</button>
       </form>
 
@@ -255,10 +257,26 @@ onMounted(() => {
                 <span v-else class="text-xs text-neutral-500">{{ t('adminVideos.flagPool') }}</span>
               </td>
               <td class="py-2 whitespace-nowrap text-right">
-                <button type="button" class="text-sm font-medium text-red-600 hover:underline" @click="editVideo(video)">{{ t('adminVideos.edit') }}</button>
-                <button type="button" class="ml-3 text-sm font-medium text-neutral-600 hover:underline" @click="refreshVideo(video)">
-                  {{ t('adminVideos.refresh') }}
-                </button>
+                <div class="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-accent"
+                    :aria-label="t('adminVideos.edit')"
+                    :title="t('adminVideos.edit')"
+                    @click="editVideo(video)"
+                  >
+                    <PencilSquareIcon class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-neutral"
+                    :aria-label="t('adminVideos.refresh')"
+                    :title="t('adminVideos.refresh')"
+                    @click="refreshVideo(video)"
+                  >
+                    <ArrowPathIcon class="size-4" />
+                  </button>
+                </div>
               </td>
             </tr>
             <tr v-if="videos.length === 0">
@@ -302,19 +320,19 @@ onMounted(() => {
       <dl v-if="formMetadata" class="grid grid-cols-1 gap-1 rounded-lg bg-neutral-50 px-3 py-2.5 text-sm sm:grid-cols-2">
         <div>
           <dt class="inline text-neutral-500">{{ t('adminVideos.metaTitle') }}:</dt>
-          <dd class="inline text-neutral-900">{{ formMetadata.title }}</dd>
+          <dd class="ml-1 inline text-neutral-900">{{ formMetadata.title }}</dd>
         </div>
         <div>
           <dt class="inline text-neutral-500">{{ t('adminVideos.metaChannel') }}:</dt>
-          <dd class="inline text-neutral-900">{{ formMetadata.channel }}</dd>
+          <dd class="ml-1 inline text-neutral-900">{{ formMetadata.channel }}</dd>
         </div>
         <div>
           <dt class="inline text-neutral-500">{{ t('adminVideos.metaDuration') }}:</dt>
-          <dd class="inline text-neutral-900">{{ formMetadata.durationSec }} {{ t('common.seconds') }}</dd>
+          <dd class="ml-1 inline text-neutral-900">{{ formMetadata.durationSec }} {{ t('common.seconds') }}</dd>
         </div>
         <div>
           <dt class="inline text-neutral-500">{{ t('adminVideos.metaViews') }}:</dt>
-          <dd class="inline text-neutral-900">{{ formMetadata.viewCount.toLocaleString('de-DE') }}</dd>
+          <dd class="ml-1 inline text-neutral-900">{{ formMetadata.viewCount.toLocaleString('de-DE') }}</dd>
         </div>
       </dl>
 

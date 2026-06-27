@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { CheckIcon, ClipboardIcon, ExclamationTriangleIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { useGameState } from '../../composables/useGameState.js';
 import { useMute } from '../../composables/useMute.js';
@@ -41,7 +42,11 @@ function enableSound(): void {
     <div class="card flex flex-col items-center gap-3 text-center">
       <p class="text-sm font-medium text-neutral-500">{{ t('lobby.roomCode') }}</p>
       <p class="text-4xl font-semibold tracking-[0.25em] text-neutral-900 tabular-nums">{{ store.lobby?.code }}</p>
-      <button type="button" class="btn btn-secondary" @click="copyCode">{{ copied ? t('lobby.copied') : t('lobby.copyCode') }}</button>
+      <button type="button" class="btn btn-secondary" @click="copyCode">
+        <CheckIcon v-if="copied" class="size-4 shrink-0" />
+        <ClipboardIcon v-else class="size-4 shrink-0" />
+        {{ copied ? t('lobby.copied') : t('lobby.copyCode') }}
+      </button>
     </div>
 
     <div class="card flex flex-col gap-4">
@@ -54,13 +59,7 @@ function enableSound(): void {
 
     <div v-if="muted" class="flex flex-col gap-3 rounded-lg bg-amber-50 p-4 ring-1 ring-amber-600/20 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div class="flex items-start gap-2.5">
-        <svg viewBox="0 0 16 16" class="mt-0.5 size-4 shrink-0 fill-amber-500" aria-hidden="true">
-          <path
-            fill-rule="evenodd"
-            d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.804a1.5 1.5 0 0 1-1.3-2.25l5.197-9ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 1 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ExclamationTriangleIcon class="mt-0.5 size-4 shrink-0 text-amber-500" />
         <p class="min-w-0 text-sm text-pretty text-amber-800">{{ t('sound.offHint') }}</p>
       </div>
       <button type="button" class="btn btn-secondary shrink-0" @click="enableSound">{{ t('sound.enable') }}</button>

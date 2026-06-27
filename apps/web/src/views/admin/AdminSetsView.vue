@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { errorCode, useErrorText } from '../../composables/useErrorText.js';
+import SearchField from '../../components/admin/SearchField.vue';
 
 interface VideoRef {
   youtubeId: string;
@@ -178,9 +180,13 @@ onMounted(() => {
               {{ set.unreadyVideos.length === 0 ? t('adminSets.stateReady') : t('adminSets.stateUnready', { count: set.unreadyVideos.length }) }}
             </p>
           </div>
-          <div class="whitespace-nowrap">
-            <button type="button" class="text-sm font-medium text-red-600 hover:underline" @click="editSet(set)">{{ t('adminSets.edit') }}</button>
-            <button type="button" class="ml-3 text-sm font-medium text-neutral-600 hover:underline" @click="deleteSet(set)">{{ t('adminSets.delete') }}</button>
+          <div class="flex shrink-0 items-center gap-1">
+            <button type="button" class="icon-btn icon-btn-accent" :aria-label="t('adminSets.edit')" :title="t('adminSets.edit')" @click="editSet(set)">
+              <PencilSquareIcon class="size-4" />
+            </button>
+            <button type="button" class="icon-btn icon-btn-neutral" :aria-label="t('adminSets.delete')" :title="t('adminSets.delete')" @click="deleteSet(set)">
+              <TrashIcon class="size-4" />
+            </button>
           </div>
         </li>
         <li v-if="sets.length === 0" class="py-6 text-center text-sm text-neutral-500">{{ t('adminSets.empty') }}</li>
@@ -215,20 +221,36 @@ onMounted(() => {
             <span class="truncate"
               ><span class="text-neutral-500">{{ index + 1 }}.</span> {{ video.title ?? video.youtubeId }}</span
             >
-            <span class="flex shrink-0 gap-2 text-neutral-600">
-              <button type="button" class="hover:text-neutral-900" :disabled="index === 0" :aria-label="t('adminSets.moveUp')" @click="move(index, -1)">
-                ↑
+            <span class="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                class="icon-btn icon-btn-neutral"
+                :disabled="index === 0"
+                :aria-label="t('adminSets.moveUp')"
+                :title="t('adminSets.moveUp')"
+                @click="move(index, -1)"
+              >
+                <ChevronUpIcon class="size-4" />
               </button>
               <button
                 type="button"
-                class="hover:text-neutral-900"
+                class="icon-btn icon-btn-neutral"
                 :disabled="index === order.length - 1"
                 :aria-label="t('adminSets.moveDown')"
+                :title="t('adminSets.moveDown')"
                 @click="move(index, 1)"
               >
-                ↓
+                <ChevronDownIcon class="size-4" />
               </button>
-              <button type="button" class="font-medium text-red-600 hover:underline" @click="removeVideo(index)">{{ t('adminSets.remove') }}</button>
+              <button
+                type="button"
+                class="icon-btn icon-btn-accent"
+                :aria-label="t('adminSets.remove')"
+                :title="t('adminSets.remove')"
+                @click="removeVideo(index)"
+              >
+                <XMarkIcon class="size-4" />
+              </button>
             </span>
           </li>
           <li v-if="order.length === 0" class="text-sm text-neutral-500">{{ t('adminSets.orderEmpty') }}</li>
@@ -237,22 +259,24 @@ onMounted(() => {
 
       <div class="flex flex-col gap-2 rounded-lg ring-1 ring-neutral-100 p-3">
         <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="searchVideos">
-          <input v-model="pickerQuery" type="search" class="field" :placeholder="t('adminSets.pickerPlaceholder')" />
+          <SearchField v-model="pickerQuery" :placeholder="t('adminSets.pickerPlaceholder')" />
           <button type="submit" class="btn btn-secondary sm:w-auto">{{ t('adminSets.pickerSearch') }}</button>
         </form>
         <ul class="flex max-h-48 flex-col divide-y divide-neutral-100 overflow-y-auto">
-          <li v-for="video in pickerResults" :key="video.youtubeId" class="flex items-center justify-between gap-3 py-2 text-sm">
-            <span class="truncate"
-              >{{ video.title ?? video.youtubeId }} <span class="text-xs text-neutral-500">{{ video.channel ?? '' }}</span></span
-            >
+          <li v-for="video in pickerResults" :key="video.youtubeId" class="flex items-center gap-2 py-2 text-sm">
             <button
               type="button"
-              class="shrink-0 font-medium text-red-600 hover:underline disabled:text-neutral-300"
+              class="icon-btn icon-btn-accent shrink-0"
               :disabled="orderedIds.includes(video.youtubeId)"
+              :aria-label="t('adminSets.add')"
+              :title="t('adminSets.add')"
               @click="addVideo(video)"
             >
-              {{ t('adminSets.add') }}
+              <PlusIcon class="size-4" />
             </button>
+            <span class="min-w-0 flex-1 truncate"
+              >{{ video.title ?? video.youtubeId }} <span class="text-xs text-neutral-500">{{ video.channel ?? '' }}</span></span
+            >
           </li>
         </ul>
       </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { PlayIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { useGameState } from '../../composables/useGameState.js';
 import PhaseHeader from '../game/PhaseHeader.vue';
@@ -27,9 +28,7 @@ const results = computed(() =>
     <div class="text-center">
       <div v-if="store.reveal?.title" class="mb-5 flex items-center justify-center gap-2">
         <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-red-600 text-white">
-          <svg viewBox="0 0 24 24" class="size-4 fill-current" aria-hidden="true">
-            <path d="M8 5.14v13.72a.5.5 0 0 0 .77.42l10.29-6.86a.5.5 0 0 0 0-.84L8.77 4.72A.5.5 0 0 0 8 5.14Z" />
-          </svg>
+          <PlayIcon class="size-4" />
         </span>
         <p class="text-lg font-semibold text-balance text-neutral-900 sm:text-xl">{{ store.reveal.title }}</p>
       </div>

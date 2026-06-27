@@ -17,7 +17,7 @@
 /* Shared control + surface styles, applied as `btn btn-primary`, `field`, `card`, so every screen stays
    consistent without repeating long class strings. */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-base font-semibold outline-offset-2 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50 sm:py-2 sm:text-sm;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-base font-semibold whitespace-nowrap outline-offset-2 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-50 sm:py-2 sm:text-sm;
 }
 
 @utility btn-primary {
@@ -26,6 +26,20 @@
 
 @utility btn-secondary {
   @apply bg-white text-neutral-900 ring-1 ring-neutral-950/15 outline-red-600 hover:bg-neutral-50;
+}
+
+/* Icon-only action buttons, applied as `icon-btn icon-btn-accent`. disabled:pointer-events-none keeps the
+   hover background from showing on a disabled button. */
+@utility icon-btn {
+  @apply rounded p-1 outline-red-600 outline-offset-2 focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-30;
+}
+
+@utility icon-btn-accent {
+  @apply text-red-600 hover:bg-red-50;
+}
+
+@utility icon-btn-neutral {
+  @apply text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700;
 }
 
 @utility field {
