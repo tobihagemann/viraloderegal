@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { auth } from '../auth/auth.js';
 import { ensureCredentialUser } from '../auth/credentials.js';
+import { errorJson } from '../http/errorResponse.js';
 
 // better-auth's acceptInvitation requires an already-logged-in account whose email matches the invitation,
 // and never creates the account or sets its password. So onboarding an invited admin is server-owned here:
@@ -29,7 +30,7 @@ export function toCookieHeader(setCookies: string[]): string {
 export const adminInvites = new Hono().post('/accept', async (c) => {
   const body = acceptInviteSchema.safeParse(await c.req.json().catch(() => null));
   if (!body.success) {
-    return c.json({ code: 'invalid_request' }, 400);
+    return errorJson(c, 'invalid_request', 400);
   }
   const { invitationId, password } = body.data;
   const ctx = await auth.$context;
@@ -39,7 +40,7 @@ export const adminInvites = new Hono().post('/accept', async (c) => {
     where: [{ field: 'id', value: invitationId }],
   });
   if (!invitation || invitation.status !== 'pending' || new Date(invitation.expiresAt).getTime() <= Date.now()) {
-    return c.json({ code: 'invalid_invitation' }, ACCEPT_ERROR_STATUS.invalid_invitation);
+    return errorJson(c, 'invalid_invitation', ACCEPT_ERROR_STATUS.invalid_invitation);
   }
 
   try {
@@ -58,6 +59,6 @@ export const adminInvites = new Hono().post('/accept', async (c) => {
     }
     return c.json({ ok: true }, 200);
   } catch {
-    return c.json({ code: 'accept_failed' }, ACCEPT_ERROR_STATUS.accept_failed);
+    return errorJson(c, 'accept_failed', ACCEPT_ERROR_STATUS.accept_failed);
   }
 });

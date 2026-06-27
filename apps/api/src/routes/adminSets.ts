@@ -1,8 +1,9 @@
-import { curatedSetUpsertSchema } from '@viraloderegal/shared';
+import { curatedSetUpsertSchema, type WireErrorCode } from '@viraloderegal/shared';
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { requireAdmin } from '../auth/requireAdmin.js';
+import { errorJson } from '../http/errorResponse.js';
 import { findUnreadyVideos, type SetVideoState } from '../curation/setReadiness.js';
 import { loadVideoStates } from '../curation/videoStates.js';
 import { toVideoDto } from '../curation/videoDto.js';
@@ -50,13 +51,13 @@ export const adminSets = new Hono()
   .post('/', async (c) => {
     const body = setUpsertRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) {
-      return c.json({ code: 'invalid_request' }, 400);
+      return errorJson(c, 'invalid_request', 400);
     }
     const input = body.data;
     if (input.enabled) {
       const unready = findUnreadyVideos(input.videoOrder, await loadVideoStates(input.videoOrder));
       if (unready.length > 0) {
-        return c.json({ code: 'set_incomplete', videos: unready }, SET_ERROR_STATUS.set_incomplete);
+        return c.json({ code: 'set_incomplete' satisfies WireErrorCode, videos: unready }, SET_ERROR_STATUS.set_incomplete);
       }
     }
     const values = { name: input.name, description: input.description, video_order: input.videoOrder, enabled: input.enabled };
@@ -64,14 +65,14 @@ export const adminSets = new Hono()
       if (input.id) {
         const result = await db.updateTable('curated_sets').set(values).where('id', '=', input.id).executeTakeFirst();
         if (result.numUpdatedRows === 0n) {
-          return c.json({ code: 'set_not_found' }, SET_ERROR_STATUS.set_not_found);
+          return errorJson(c, 'set_not_found', SET_ERROR_STATUS.set_not_found);
         }
       } else {
         await db.insertInto('curated_sets').values(values).execute();
       }
     } catch (err) {
       if (isUniqueViolation(err, 'curated_sets_name_key')) {
-        return c.json({ code: 'set_name_taken' }, SET_ERROR_STATUS.set_name_taken);
+        return errorJson(c, 'set_name_taken', SET_ERROR_STATUS.set_name_taken);
       }
       throw err;
     }

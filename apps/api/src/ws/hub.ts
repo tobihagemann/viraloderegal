@@ -1,5 +1,5 @@
 import type { Server } from 'node:http';
-import { type ClientCommand, clientCommandSchema, type ServerEvent } from '@viraloderegal/shared';
+import { type ClientCommand, clientCommandSchema, type ServerEvent, type WireErrorCode } from '@viraloderegal/shared';
 import type { ServerType } from '@hono/node-server';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { db } from '../db/kysely.js';
@@ -56,7 +56,7 @@ function sendEvent(socket: WebSocket, event: ServerEvent): void {
   }
 }
 
-function sendError(socket: WebSocket, code: string, message: string): void {
+function sendError(socket: WebSocket, code: WireErrorCode, message: string): void {
   sendEvent(socket, { type: 'error', code, message });
 }
 

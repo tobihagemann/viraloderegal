@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { errorJson } from '../http/errorResponse.js';
 import { auth } from './auth.js';
 
 // The admin-session boundary every admin CRUD/refresh route mounts behind. "Any valid better-auth session ⇒
@@ -9,7 +10,7 @@ import { auth } from './auth.js';
 export const requireAdmin = createMiddleware(async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) {
-    return c.json({ code: 'unauthorized' }, 401);
+    return errorJson(c, 'unauthorized', 401);
   }
   await next();
 });

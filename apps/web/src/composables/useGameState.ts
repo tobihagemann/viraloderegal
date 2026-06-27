@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue';
-import type { GameSnapshot, LobbyState, Player, RoundPhase, RoundResult, ServerEvent, Standing } from '@viraloderegal/shared';
+import type { GameSnapshot, LobbyState, Player, RoundPhase, RoundResult, ServerEvent, Standing, WireErrorCode } from '@viraloderegal/shared';
 
 // Reuse the snapshot's own field types so the live-event store and the reconnect snapshot cannot drift.
 type RoundInfo = NonNullable<GameSnapshot['round']>;
@@ -23,7 +23,8 @@ interface GameStore {
   roundsHistory: RoundResult[];
   finished: boolean;
   roomWarning: number | null;
-  lastError: { code: string; message: string } | null;
+  // Only ever populated from a ws error event, whose code the narrowed errorEventSchema types as WireErrorCode.
+  lastError: { code: WireErrorCode; message: string } | null;
   kicked: 'kick' | 'ban' | null;
   // A terminal token rejection (the join was refused for good): the session is over and reconnecting is
   // pointless, so the view should leave the room rather than wait on a dead socket.

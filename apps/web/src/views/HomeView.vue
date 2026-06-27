@@ -13,7 +13,7 @@ import {
   validateUsername,
 } from '@viraloderegal/shared';
 import { storeSessionToken } from '../composables/useStorage.js';
-import { errorCode, useErrorText } from '../composables/useErrorText.js';
+import { errorCode, toDisplayErrorCode, useErrorText } from '../composables/useErrorText.js';
 
 const router = useRouter();
 const route = useRoute();
@@ -31,7 +31,7 @@ const formError = ref<string | null>(null);
 // Surface a terminal error handed off from the room view (an expired/cleaned-up session, or a ban), then drop
 // the query param so a later reload of the home screen doesn't re-show a stale message.
 if (typeof route.query.error === 'string') {
-  formError.value = resolveError(route.query.error);
+  formError.value = resolveError(toDisplayErrorCode(route.query.error));
   void router.replace({ query: {} });
 }
 

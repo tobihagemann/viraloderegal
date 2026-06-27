@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_GUESS, ROOM_STATUSES, ROUND_PHASES } from '../constants.js';
+import { WIRE_ERROR_CODES } from '../errorCodes.js';
 import { roundScoreSchema, standingSchema } from '../scoring.js';
 import { gameSettingsSchema, roomCodeSchema } from './http.js';
 
@@ -142,7 +143,7 @@ export const roomWarningEventSchema = z.object({
 
 export const errorEventSchema = z.object({
   type: z.literal('error'),
-  code: z.string(),
+  code: z.enum(WIRE_ERROR_CODES),
   message: z.string(),
 });
 

@@ -62,8 +62,10 @@ describe('serverEventSchema', () => {
     expect(serverEventSchema.safeParse({ type: 'phase', phase: 'clip', phaseEndAt: 'soon' }).success).toBe(false);
   });
 
-  it('accepts an error event with a code and message', () => {
+  it('accepts an error event with a wire code and rejects a non-wire code', () => {
     expect(serverEventSchema.safeParse({ type: 'error', code: 'room_full', message: 'Room is full' }).success).toBe(true);
+    // 'generic' is a client-only display code the SPA synthesizes; it must never be a valid wire payload.
+    expect(serverEventSchema.safeParse({ type: 'error', code: 'generic', message: 'Something went wrong' }).success).toBe(false);
   });
 
   it('accepts a snapshot event carrying the recipient id and a lobby state', () => {

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { auth } from './auth/auth.js';
 import { TRUSTED_IP_HEADER } from './auth/ip.js';
 import { isProduction } from './env.js';
+import { errorJson } from './http/errorResponse.js';
 import { clientIp } from './rooms/clientIp.js';
 import { adminInvites } from './routes/adminInvites.js';
 import { adminSets } from './routes/adminSets.js';
@@ -45,5 +46,5 @@ if (isProduction) {
 
 app.onError((err, c) => {
   console.error(err);
-  return c.json({ code: 'internal' }, 500);
+  return errorJson(c, 'internal', 500);
 });

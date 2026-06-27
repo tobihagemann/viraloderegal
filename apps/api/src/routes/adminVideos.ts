@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { z } from 'zod';
 import { toVideoDto } from '../curation/videoDto.js';
+import { errorJson } from '../http/errorResponse.js';
 import { requireAdmin } from '../auth/requireAdmin.js';
 import { isCheckViolation } from '../db/constraints.js';
 import { db } from '../db/kysely.js';
@@ -81,7 +82,7 @@ export const adminVideos = new Hono()
   .post('/metadata', async (c) => {
     const body = metadataRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) {
-      return c.json({ code: 'invalid_request' }, 400);
+      return errorJson(c, 'invalid_request', 400);
     }
     try {
       const { metadata, viewCount } = await fetchVideoForUpsert(body.data.youtubeId);
@@ -89,7 +90,7 @@ export const adminVideos = new Hono()
     } catch (err) {
       const code = youtubeErrorCode(err);
       if (code) {
-        return c.json({ code }, CURATION_ERROR_STATUS[code]);
+        return errorJson(c, code, CURATION_ERROR_STATUS[code]);
       }
       throw err;
     }
@@ -98,7 +99,7 @@ export const adminVideos = new Hono()
   .post('/', async (c) => {
     const body = videoUpsertSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) {
-      return c.json({ code: 'invalid_request' }, 400);
+      return errorJson(c, 'invalid_request', 400);
     }
     const input = body.data;
     let metadata: { title: string; channel: string; durationSec: number };
@@ -108,12 +109,12 @@ export const adminVideos = new Hono()
     } catch (err) {
       const code = youtubeErrorCode(err);
       if (code) {
-        return c.json({ code }, CURATION_ERROR_STATUS[code]);
+        return errorJson(c, code, CURATION_ERROR_STATUS[code]);
       }
       throw err;
     }
     if (input.clipEndSec > metadata.durationSec) {
-      return c.json({ code: 'clip_out_of_range' }, CURATION_ERROR_STATUS.clip_out_of_range);
+      return errorJson(c, 'clip_out_of_range', CURATION_ERROR_STATUS.clip_out_of_range);
     }
     const values = {
       title_snapshot: metadata.title,
@@ -135,7 +136,7 @@ export const adminVideos = new Hono()
         .execute();
     } catch (err) {
       if (isCheckViolation(err, 'videos_clip_segment_check')) {
-        return c.json({ code: 'clip_out_of_range' }, CURATION_ERROR_STATUS.clip_out_of_range);
+        return errorJson(c, 'clip_out_of_range', CURATION_ERROR_STATUS.clip_out_of_range);
       }
       throw err;
     }
@@ -148,11 +149,11 @@ export const adminVideos = new Hono()
     // Validate the id charset locally (like the sibling routes) before it reaches the YouTube URL, rather
     // than relying on the storage invariant that only validated ids are persisted.
     if (!youtubeIdSchema.safeParse(youtubeId).success) {
-      return c.json({ code: 'invalid_request' }, 400);
+      return errorJson(c, 'invalid_request', 400);
     }
     const existing = await db.selectFrom('videos').select('view_count_snapshot').where('youtube_id', '=', youtubeId).executeTakeFirst();
     if (!existing) {
-      return c.json({ code: 'video_not_found' }, CURATION_ERROR_STATUS.video_not_found);
+      return errorJson(c, 'video_not_found', CURATION_ERROR_STATUS.video_not_found);
     }
     try {
       const viewCount = await fetchViewCount(youtubeId);
@@ -166,7 +167,7 @@ export const adminVideos = new Hono()
     } catch (err) {
       const code = youtubeErrorCode(err);
       if (code) {
-        return c.json({ code }, CURATION_ERROR_STATUS[code]);
+        return errorJson(c, code, CURATION_ERROR_STATUS[code]);
       }
       // Any other failure (e.g. a transient network error) falls back to the stored snapshot.
       return c.json({ viewCount: existing.view_count_snapshot, snapshotRefreshedAt: null, stale: true });
