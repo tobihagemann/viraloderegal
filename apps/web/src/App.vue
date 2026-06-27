@@ -11,7 +11,15 @@ const { t } = useI18n();
     <header class="sticky top-0 z-10 border-b border-neutral-950/10 bg-white/90 backdrop-blur">
       <div class="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-4 px-4 sm:px-6">
         <RouterLink to="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-neutral-900">
-          <span class="size-2.5 shrink-0 rounded-full bg-red-600" aria-hidden="true"></span>
+          <svg class="size-7 shrink-0" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <g class="fill-neutral-400">
+              <rect x="6" y="42" width="8" height="12" rx="4" />
+              <rect x="17" y="32" width="8" height="22" rx="4" />
+              <rect x="39" y="32" width="8" height="22" rx="4" />
+              <rect x="50" y="42" width="8" height="12" rx="4" />
+            </g>
+            <rect x="28" y="12" width="8" height="42" rx="4" class="fill-red-600" />
+          </svg>
           {{ t('app.title') }}
         </RouterLink>
         <MuteToggle />
