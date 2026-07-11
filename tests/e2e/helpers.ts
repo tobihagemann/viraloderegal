@@ -71,6 +71,13 @@ export async function connect(token: string): Promise<{ ws: WsClient; playerId: 
   return { ws, playerId: snapshot.you };
 }
 
+// The fake YouTube server's cumulative (never-reset) request count for an id; callers assert before/after deltas.
+export async function fakeYoutubeCount(id: string): Promise<number> {
+  const res = await fetch(`http://localhost:${process.env.E2E_YOUTUBE_PORT ?? '3100'}/__count?id=${id}`);
+  const body = (await res.json()) as { count: number };
+  return body.count;
+}
+
 // Consume lobby broadcasts until one satisfies the predicate (multiple clients race their own broadcasts).
 export async function waitForLobby(ws: WsClient, predicate: (lobby: EventOfType<'lobby'>['lobby']) => boolean): Promise<EventOfType<'lobby'>['lobby']> {
   for (;;) {

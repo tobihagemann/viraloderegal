@@ -3,7 +3,7 @@ import { QUOTA_BACKOFF_MS } from './constants.js';
 
 // Give the client a configured key and a controllable clock + fetch. resetModules per test gives the client's
 // module-scoped quota-backoff state a clean slate, so test order does not matter.
-vi.mock('../env.js', () => ({ env: { YOUTUBE_API_KEY: 'test-key' }, isProduction: false }));
+vi.mock('../env.js', () => ({ env: { YOUTUBE_API_KEY: 'test-key', YOUTUBE_TRANSPORT: 'live' }, isProduction: false }));
 
 const fetchMock = vi.fn<typeof fetch>();
 

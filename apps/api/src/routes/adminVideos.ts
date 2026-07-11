@@ -135,6 +135,9 @@ export const adminVideos = new Hono()
         .onConflict((oc) => oc.column('youtube_id').doUpdateSet(values))
         .execute();
     } catch (err) {
+      // Intentional defense-in-depth: unreachable through the route today (Zod's clip-length refine and the
+      // pre-insert clipEndSec > durationSec guard already cover every CHECK clause), retained as a backstop
+      // against future Zod/CHECK drift and exercised by dedicated wiring and drift tests.
       if (isCheckViolation(err, 'videos_clip_segment_check')) {
         return errorJson(c, 'clip_out_of_range', CURATION_ERROR_STATUS.clip_out_of_range);
       }

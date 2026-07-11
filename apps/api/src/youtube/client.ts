@@ -2,7 +2,9 @@ import { env } from '../env.js';
 import { FETCH_TIMEOUT_MS, QUOTA_BACKOFF_MS } from './constants.js';
 import { isQuotaExceededError, mapVideosListItem, type VideoMetadata, type YouTubeVideoItem } from './parse.js';
 
-const VIDEOS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/videos';
+// In `fake` transport the env guard guarantees a loopback YOUTUBE_API_BASE_URL is present; new URL('/videos',
+// base) yields …/videos even when base carries a trailing-slash root (string concatenation would double it).
+const VIDEOS_ENDPOINT = env.YOUTUBE_TRANSPORT === 'fake' ? new URL('/videos', env.YOUTUBE_API_BASE_URL).href : 'https://www.googleapis.com/youtube/v3/videos';
 
 // Raised when YOUTUBE_API_KEY is unset; the env field stays optional so the API boots without curation, and
 // any curation call surfaces this as config_missing rather than crashing.

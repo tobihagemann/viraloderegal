@@ -22,5 +22,10 @@ export default tseslint.config(
     files: ['apps/api/migrations/**/*.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
+  {
+    // Plain-Node e2e scripts (no TS, so no-undef stays on): declare the Node globals they use.
+    files: ['tests/e2e/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', URL: 'readonly' } },
+  },
   configPrettier,
 );

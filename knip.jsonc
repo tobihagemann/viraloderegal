@@ -6,6 +6,11 @@
   // so genuinely dead value exports (functions/consts) are still reported even when self-referenced in-file.
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
   "workspaces": {
+    ".": {
+      // Launched by Playwright via a webServer command string, not statically imported (the Playwright plugin
+      // already treats globalSetup — seed-fixtures.ts — as an entry, so it needs no listing here).
+      "entry": ["tests/e2e/fake-youtube-server.mjs"],
+    },
     "apps/api": {
       // Migrations are discovered and imported at runtime by Kysely's FileMigrationProvider, not statically.
       "ignore": ["migrations/**"],
