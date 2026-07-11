@@ -58,6 +58,8 @@ async function readyRoom(request: APIRequestContext, hostOctet: string, guestOct
 async function playToGameOver(host: WsClient, guest: WsClient, rounds: number): Promise<EventOfType<'gameOver'>> {
   for (let roundNo = 1; roundNo <= rounds; roundNo++) {
     const round = await host.nextOfType('round');
+    // Each round opens on a prepare-phase round event, then a clip phase, then the guess phase.
+    await host.nextOfType('phase');
     await host.nextOfType('phase');
     // Commit final guesses so the guess window ends on the early-advance instead of running its full timer,
     // keeping the multi-round run well under the test budget.
@@ -65,9 +67,13 @@ async function playToGameOver(host: WsClient, guest: WsClient, rounds: number): 
     guest.send({ type: 'guess', value: 0, final: true });
     await host.nextOfType('reveal');
     await host.nextOfType('leaderboard');
-    const interPhase = await host.nextOfType('phase');
-    expect(interPhase.phase).toBe('inter');
-    host.send({ type: 'skipIntermission' });
+    // The deterministic final round auto-finishes: no intermission, straight to gameOver. Skipping the inter
+    // block on the last iteration avoids nextOfType('phase') swallowing the gameOver event while hunting.
+    if (roundNo < rounds) {
+      const interPhase = await host.nextOfType('phase');
+      expect(interPhase.phase).toBe('inter');
+      host.send({ type: 'skipIntermission' });
+    }
   }
   return host.nextOfType('gameOver');
 }
@@ -78,17 +84,25 @@ test('a full game runs through clip, guess, reveal, leaderboard, and a final gam
 
   host.send({ type: 'start', settings: GAME_SETTINGS });
 
+  const playedIds: string[] = [];
   for (let roundNo = 1; roundNo <= 3; roundNo++) {
     const round = await host.nextOfType('round');
     expect(round.roundNo).toBe(roundNo);
     expect(round.roundsTotal).toBe(3);
-    // Anti-cheat: the clip-phase round event must not carry the title, or players could look up the answer.
+    // Anti-cheat: the round event (broadcast at prepare start) must not carry the title, or players could
+    // look up the answer during the get-ready window.
     expect('title' in round).toBe(false);
+    playedIds.push(round.youtubeId);
 
+    // Each round begins in prepare (the round event), then the clip plays, then the guess window opens.
+    const clipPhase = await host.nextOfType('phase');
+    expect(clipPhase.phase).toBe('clip');
     const guessPhase = await host.nextOfType('phase');
     expect(guessPhase.phase).toBe('guess');
-    // Monotonic deadlines: the guess window closes after the clip ends.
-    expect(new Date(guessPhase.phaseEndAt).getTime()).toBeGreaterThan(new Date(round.phaseEndAt).getTime());
+    // Monotonic deadlines across prepare → clip → guess: the clip plays after the get-ready window and the
+    // guess window closes after the clip ends.
+    expect(new Date(clipPhase.phaseEndAt).getTime()).toBeGreaterThan(new Date(round.phaseEndAt).getTime());
+    expect(new Date(guessPhase.phaseEndAt).getTime()).toBeGreaterThan(new Date(clipPhase.phaseEndAt).getTime());
 
     const trueCount = VIEW_COUNTS[round.youtubeId];
     host.send({ type: 'guess', value: trueCount });
@@ -120,27 +134,37 @@ test('a full game runs through clip, guess, reveal, leaderboard, and a final gam
     expect(leaderboard.standings.find((s) => s.playerName === 'Alice')?.totalPoints).toBe(roundNo);
     expect(leaderboard.standings.find((s) => s.playerName === 'Alice')?.rank).toBe(1);
 
-    const interPhase = await host.nextOfType('phase');
-    expect(interPhase.phase).toBe('inter');
+    // The deterministic final round auto-finishes: no intermission, straight to gameOver after the board.
+    if (roundNo < 3) {
+      const interPhase = await host.nextOfType('phase');
+      expect(interPhase.phase).toBe('inter');
 
-    if (roundNo === 1) {
-      // A non-host cannot skip the intermission.
-      guest.send({ type: 'skipIntermission' });
-      expect((await guest.nextOfType('error')).code).toBe('not_host');
+      if (roundNo === 1) {
+        // A non-host cannot skip the intermission.
+        guest.send({ type: 'skipIntermission' });
+        expect((await guest.nextOfType('error')).code).toBe('not_host');
+      }
+      host.send({ type: 'skipIntermission' });
     }
-    host.send({ type: 'skipIntermission' });
   }
 
-  const over = await host.nextOfType('gameOver');
+  // Auto-finish: the very next event after the final round's leaderboard is gameOver — no intermission phase
+  // is emitted (nextOfType would otherwise swallow a stray inter, so assert the immediate next event's type).
+  const finalEvent = await host.next();
+  expect(finalEvent.type).toBe('gameOver');
+  const over = finalEvent as EventOfType<'gameOver'>;
   expect(over.standings).toEqual([
     { playerName: 'Alice', totalPoints: 3, rank: 1 },
     { playerName: 'Bob', totalPoints: 0, rank: 2 },
   ]);
   expect(over.rounds).toHaveLength(3);
   expect(over.rounds.map((r) => r.roundNo)).toEqual([1, 2, 3]);
-  // The title is decoupled from the end-screen history (it rides only the live reveal), so the gameOver
-  // round results must stay title-free even though they share the reveal payload's other fields.
-  expect(over.rounds.every((round) => !('title' in round))).toBe(true);
+  // The end-screen recap now carries each round's title (the game is over, so revealing it is safe); the
+  // live pre-reveal payloads still withhold it.
+  expect(over.rounds.every((round) => 'title' in round)).toBe(true);
+  over.rounds.forEach((round, index) => {
+    expect(round.title).toBe(EXPECTED_TITLES[playedIds[index]]);
+  });
 
   host.close();
   guest.close();
@@ -162,6 +186,26 @@ test('a host can report a clip failure to swap the video without consuming the r
   // A duplicate report naming the already-skipped round is ignored: no second replacement is drawn.
   host.send({ type: 'reportClipFailure', roundId: first.roundId });
   expect((await host.nextOfType('error')).code).toBe('invalid_round');
+
+  host.close();
+  guest.close();
+});
+
+test('a host can report a clip failure during the clip phase, not just prepare', async ({ request }) => {
+  const { host, guest } = await readyRoom(request, '136', '137');
+
+  host.send({ type: 'start', settings: GAME_SETTINGS });
+  const first = await host.nextOfType('round');
+  expect(first.roundNo).toBe(1);
+
+  // Advance past prepare into the clip phase, then report there: the failure guard accepts prepare OR clip,
+  // so an embed error surfacing once the clip plays still swaps the video without consuming the round number.
+  const clipPhase = await host.nextOfType('phase');
+  expect(clipPhase.phase).toBe('clip');
+  host.send({ type: 'reportClipFailure', roundId: first.roundId });
+  const replacement = await host.nextOfType('round');
+  expect(replacement.roundNo).toBe(1);
+  expect(replacement.youtubeId).not.toBe(first.youtubeId);
 
   host.close();
   guest.close();
@@ -191,6 +235,8 @@ test('a mid-game reconnect resyncs the player with the active game snapshot and 
 
   host.send({ type: 'start', settings: GAME_SETTINGS });
   const round = await host.nextOfType('round');
+  // Consume the clip phase inserted after the prepare-phase round event, then land on the guess window.
+  await host.nextOfType('phase');
   const guessPhase = await host.nextOfType('phase');
   expect(guessPhase.phase).toBe('guess');
   const trueCount = VIEW_COUNTS[round.youtubeId];
@@ -221,12 +267,45 @@ test('a mid-game reconnect resyncs the player with the active game snapshot and 
   back.close();
 });
 
+test('a reconnect during the prepare phase resumes the get-ready round without leaking the answer', async ({ request }) => {
+  test.setTimeout(120_000);
+  const { host, guest, hostToken } = await readyRoom(request, '138', '139');
+
+  host.send({ type: 'start', settings: GAME_SETTINGS });
+  const round = await host.nextOfType('round');
+  // The round event is broadcast at the prepare start and carries no title (the answer rides only the reveal).
+  expect(round.phase).toBe('prepare');
+  expect('title' in round).toBe(false);
+
+  // Empty the room during the get-ready window so the scheduler pauses in prepare, then reconnect the host.
+  host.close();
+  guest.close();
+  await host.closed;
+  await guest.closed;
+
+  const back = await openWs();
+  back.send({ type: 'join', sessionToken: hostToken });
+  const snapshot = await back.nextOfType('snapshot');
+  expect(snapshot.game?.phase).toBe('prepare');
+  expect(snapshot.game?.round?.roundId).toBe(round.roundId);
+  // No reveal data (and thus no title) is exposed while the round is still in prepare.
+  expect(snapshot.game?.reveal).toBeNull();
+
+  // The paused get-ready window resumes and advances into the clip phase for the reconnected player.
+  const clipPhase = await back.nextOfType('phase');
+  expect(clipPhase.phase).toBe('clip');
+
+  back.close();
+});
+
 test('a reconnect during reveal_sting withholds the just-scored round from the snapshot standings', async ({ request }) => {
   test.setTimeout(120_000);
   const { host, guest, hostToken } = await readyRoom(request, '130', '131');
 
   host.send({ type: 'start', settings: GAME_SETTINGS });
   const round = await host.nextOfType('round');
+  // Consume the clip phase inserted after the prepare-phase round event, then land on the guess window.
+  await host.nextOfType('phase');
   const guessPhase = await host.nextOfType('phase');
   expect(guessPhase.phase).toBe('guess');
   host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId] });
@@ -263,6 +342,8 @@ test('a rematch from a finished room starts a fresh game whose leaderboard exclu
   host.send({ type: 'start', settings: GAME_SETTINGS });
   const round = await host.nextOfType('round');
   expect(round.roundNo).toBe(1);
+  // Consume the clip phase and land on the guess window (round event is prepare-phase now).
+  await host.nextOfType('phase');
   await host.nextOfType('phase');
   host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId], final: true });
   guest.send({ type: 'guess', value: 0, final: true });
@@ -281,6 +362,8 @@ test('the guess window ends early once every connected player commits a final gu
   const { host, guest } = await readyRoom(request, '132', '133');
   host.send({ type: 'start', settings: { source: 'random', roundsTotal: 3, guessTimerSec: 60 } });
   const round = await host.nextOfType('round');
+  // Consume the clip phase inserted after the prepare-phase round event, then land on the guess window.
+  await host.nextOfType('phase');
   const guessPhase = await host.nextOfType('phase');
   expect(guessPhase.phase).toBe('guess');
   const guessDeadline = new Date(guessPhase.phaseEndAt).getTime();
@@ -303,6 +386,8 @@ test('a draft guess does not ready a player, so the guess window runs to its tim
   const { host, guest } = await readyRoom(request, '134', '135');
   host.send({ type: 'start', settings: { source: 'random', roundsTotal: 3, guessTimerSec: 15 } });
   const round = await host.nextOfType('round');
+  // Consume the clip phase inserted after the prepare-phase round event, then land on the guess window.
+  await host.nextOfType('phase');
   const guessPhase = await host.nextOfType('phase');
   expect(guessPhase.phase).toBe('guess');
   const start = Date.now();

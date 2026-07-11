@@ -30,6 +30,10 @@ export const ROUNDS_TOTAL_OPTIONS = [3, 5, 7, 9] as const;
 export const DEFAULT_ROUNDS_TOTAL = 5;
 export type RoundsTotal = (typeof ROUNDS_TOTAL_OPTIONS)[number];
 
+/** Get-ready pre-buffer window in seconds before the clip plays, so the iframe can cue behind a countdown
+ * overlay and start the instant the clip phase begins (no black frame on a short clip). */
+export const PREPARE_SEC = 3;
+
 /** Reveal sub-phase and pacing durations in seconds: a brief suspense sting, then longer windows to read
  * the per-guess results and the updated leaderboard. */
 export const REVEAL_STING_SEC = 3;
@@ -65,7 +69,7 @@ export type GameSource = (typeof GAME_SOURCES)[number];
 export const GAME_STATUSES = ['active', 'finished'] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
-export const ROUND_PHASES = ['clip', 'guess', 'reveal_sting', 'reveal_guesses', 'reveal_board', 'inter'] as const;
+export const ROUND_PHASES = ['prepare', 'clip', 'guess', 'reveal_sting', 'reveal_guesses', 'reveal_board', 'inter'] as const;
 export type RoundPhase = (typeof ROUND_PHASES)[number];
 
 export const ROUND_STATES = ['active', 'completed', 'skipped'] as const;

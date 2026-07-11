@@ -55,6 +55,8 @@ export const de = {
   },
   game: {
     round: 'Runde {current} von {total}',
+    prepareHeading: "Gleich geht's los",
+    prepareSubtitle: 'Das Video startet gleich …',
     clipHeading: 'Schau genau hin',
     clipSubtitle: 'Wie viele Aufrufe hat dieses Video?',
     guessHeading: 'Dein Tipp',
@@ -77,7 +79,6 @@ export const de = {
   },
   leaderboard: {
     heading: 'Punktestand',
-    rank: 'Platz',
   },
   intermission: {
     heading: 'Nächste Runde',
@@ -91,7 +92,9 @@ export const de = {
     winnerTie: 'Unentschieden an der Spitze!',
     finalStanding: 'Endstand',
     roundsHeading: 'Runden im Überblick',
-    roundLabel: 'Runde {round}',
+    round: 'Runde',
+    roundLabelShort: '#{round}',
+    video: 'Video',
     rematch: 'Revanche',
     waitingForHost: 'Warte darauf, dass der Gastgeber eine Revanche startet …',
   },

@@ -109,7 +109,7 @@ describe('serverEventSchema', () => {
         youtubeId: 'dQw4w9WgXcQ',
         clipStartSec: 43,
         clipEndSec: 53,
-        phase: 'clip',
+        phase: 'prepare',
         phaseEndAt: at,
       }).success,
     ).toBe(true);
@@ -117,7 +117,7 @@ describe('serverEventSchema', () => {
     expect(serverEventSchema.safeParse({ type: 'reveal', viewCount: 130, title: 'Never Gonna Give You Up', results, phaseEndAt: at }).success).toBe(true);
     const standings = [{ playerName: 'Alex', totalPoints: 1, rank: 1 }];
     expect(serverEventSchema.safeParse({ type: 'leaderboard', standings, phaseEndAt: at }).success).toBe(true);
-    expect(serverEventSchema.safeParse({ type: 'gameOver', standings, rounds: [{ roundNo: 1, viewCount: 130, results }] }).success).toBe(true);
+    expect(serverEventSchema.safeParse({ type: 'gameOver', standings, rounds: [{ roundNo: 1, viewCount: 130, title: null, results }] }).success).toBe(true);
     expect(serverEventSchema.safeParse({ type: 'roomWarning', secondsRemaining: 60 }).success).toBe(true);
   });
 
@@ -132,7 +132,7 @@ describe('serverEventSchema', () => {
         youtubeId: 'x',
         clipStartSec: 1,
         clipEndSec: 4,
-        phase: 'clip',
+        phase: 'prepare',
         phaseEndAt: at,
       }).success,
     ).toBe(false);
@@ -162,9 +162,11 @@ describe('serverEventSchema', () => {
     expect(serverEventSchema.safeParse({ type: 'snapshot', you: UUID, lobby, game: null }).success).toBe(true);
   });
 
-  it('requires title on the reveal payload but omits it from the round-result history', () => {
-    // The asymmetry is intentional: the reveal answer requires the title; the decoupled end-screen history omits it.
+  it('requires the nullable title on both the reveal payload and the round-result history', () => {
+    // Both carry the title now: the reveal shows it live, and the end-screen recap shows it once the game is over.
     expect(revealPayloadSchema.safeParse({ viewCount: 130, results: [] }).success).toBe(false);
-    expect(roundResultSchema.safeParse({ roundNo: 1, viewCount: 130, results: [] }).success).toBe(true);
+    expect(roundResultSchema.safeParse({ roundNo: 1, viewCount: 130, results: [] }).success).toBe(false);
+    expect(roundResultSchema.safeParse({ roundNo: 1, viewCount: 130, title: 'Never Gonna Give You Up', results: [] }).success).toBe(true);
+    expect(roundResultSchema.safeParse({ roundNo: 1, viewCount: 130, title: null, results: [] }).success).toBe(true);
   });
 });

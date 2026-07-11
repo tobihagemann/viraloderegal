@@ -17,9 +17,9 @@ async function setSelect(page: Page, ariaLabel: string, optionText: string): Pro
   await page.getByRole('option', { name: optionText, exact: true }).click();
 }
 
-async function playRound(host: Page, guest: Page): Promise<void> {
-  // The guess input appears once the server advances clip → guess (independent of clip playback). Typing
-  // drafts the value; "Tipp abgeben" commits it and marks the player ready.
+async function playRound(host: Page, guest: Page, isFinal: boolean): Promise<void> {
+  // The guess input appears once the server advances prepare → clip → guess (independent of clip playback).
+  // Typing drafts the value; "Tipp abgeben" commits it and marks the player ready.
   const hostGuess = host.getByLabel('Aufrufe');
   await expect(hostGuess).toBeVisible({ timeout: 60_000 });
   await hostGuess.fill('1000000000');
@@ -30,11 +30,14 @@ async function playRound(host: Page, guest: Page): Promise<void> {
   await guestGuess.fill('100');
   await guest.getByRole('button', { name: 'Tipp abgeben' }).click();
 
-  // Once both have committed the server ends the window early. The "Weiter" control only shows in the
-  // intermission, which has a long window, so it is the stable per-round sync point.
-  const next = host.getByRole('button', { name: 'Weiter' });
-  await expect(next).toBeVisible({ timeout: 60_000 });
-  await next.click();
+  // Once both have committed the server ends the window early. The deterministic final round auto-finishes
+  // straight to the end screen; earlier rounds pause on the "Weiter" control (the intermission's long window
+  // makes it the stable per-round sync point), which the host clicks to advance.
+  if (!isFinal) {
+    const next = host.getByRole('button', { name: 'Weiter' });
+    await expect(next).toBeVisible({ timeout: 60_000 });
+    await next.click();
+  }
 }
 
 test('host and guest play a full game through the UI and start a rematch', async ({ browser }) => {
@@ -74,7 +77,7 @@ test('host and guest play a full game through the UI and start a rematch', async
   await start.click();
 
   for (let round = 1; round <= 3; round++) {
-    await playRound(host, guest);
+    await playRound(host, guest, round === 3);
   }
 
   // End screen with the per-round history, then a rematch.

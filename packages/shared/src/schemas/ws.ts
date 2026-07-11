@@ -99,11 +99,12 @@ export const revealPayloadSchema = z.object({
   results: z.array(roundScoreSchema),
 });
 
-// Broadcast at each round's clip start so clients play the segment; carries the round metadata and the
-// clip phase deadline. Non-clip transitions reuse phaseEventSchema.
+// Broadcast at each round's prepare start so clients cue the player behind the get-ready overlay; carries the
+// round metadata (still title-free — the answer rides only the reveal) and the prepare phase deadline. The
+// clip start and all later transitions reuse phaseEventSchema.
 export const roundEventSchema = activeRoundSchema.extend({
   type: z.literal('round'),
-  phase: z.literal('clip'),
+  phase: z.literal('prepare'),
   phaseEndAt: z.iso.datetime(),
 });
 
@@ -121,9 +122,9 @@ export const leaderboardEventSchema = z.object({
 });
 
 // A delivered round's result, carried in the end-screen history so late or removed clients can still
-// render the per-round table. The reveal payload's title is omitted — the end-screen recap shows view
-// counts, not titles.
-export const roundResultSchema = revealPayloadSchema.omit({ title: true }).extend({
+// render the per-round table. The game is over by the time this is shown, so it keeps the reveal payload's
+// nullable title for the recap's "Video" column; the live pre-reveal payloads still withhold it.
+export const roundResultSchema = revealPayloadSchema.extend({
   roundNo: z.number().int(),
 });
 export type RoundResult = z.infer<typeof roundResultSchema>;

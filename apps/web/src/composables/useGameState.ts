@@ -101,7 +101,7 @@ function applyEvent(event: ServerEvent): void {
       return;
     case 'round':
       store.finished = false;
-      store.phase = 'clip';
+      store.phase = 'prepare';
       store.phaseEndAt = event.phaseEndAt;
       store.round = {
         roundId: event.roundId,

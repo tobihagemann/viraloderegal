@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, type Ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, type Ref, watch } from 'vue';
 import { useMute } from './useMute.js';
 
 // Minimal surface of the YouTube IFrame Player API we use; the API ships no types and the project avoids
@@ -6,7 +6,10 @@ import { useMute } from './useMute.js';
 interface YTPlayer {
   mute(): void;
   unMute(): void;
+  isMuted(): boolean;
+  setVolume(volume: number): void;
   playVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
   destroy(): void;
 }
 
@@ -22,9 +25,14 @@ interface YTPlayerOptions {
   playerVars: Record<string, string | number>;
   events: {
     onReady?: (event: YTPlayerEvent) => void;
+    onStateChange?: (event: YTPlayerEvent) => void;
     onError?: (event: YTPlayerEvent) => void;
   };
 }
+
+// YT.PlayerState.PLAYING — used to prime the audio during the pre-roll and to drop the overlay once the
+// handed-over clip is genuinely playing.
+const YT_PLAYING = 1;
 
 interface YTNamespace {
   Player: new (element: HTMLElement, options: YTPlayerOptions) => YTPlayer;
@@ -71,14 +79,56 @@ export interface YouTubeOptions {
   videoId: string;
   startSec: number;
   endSec: number;
+  // Enables the get-ready pre-buffer behind an opaque overlay. Instead of playing on ready, the player
+  // autoplays muted (hidden) to warm the clip segment's buffer and the audio track; at reveal it seeks back to
+  // the exact clip start and plays, so every client sees the identical segment. That seek costs a ~250ms
+  // decoder re-prime even with the clip fully buffered — the caller keeps the overlay up until `playing`
+  // latches so the re-prime stays hidden. Defaults to off (play immediately on ready), for the admin preview.
+  prebuffer?: boolean;
   // Called once when the player reports a genuine embed/availability error (host-only at the call site).
   onClipError?: () => void;
 }
 
-export function useYouTube(options: YouTubeOptions): void {
+export function useYouTube(options: YouTubeOptions): { play: () => void; playing: Ref<boolean> } {
   const muted = useMute();
+  const prebuffer = options.prebuffer ?? false;
   let player: YTPlayer | null = null;
   let destroyed = false;
+  let ready = false;
+  // False only while the prebuffer pre-roll plays hidden; the clip is "handed over" (cued) at play().
+  let cued = !prebuffer;
+  // Latches true once the handed-over clip is playing, so the caller can hold its get-ready overlay until the
+  // seek re-prime is over. Latched (never reset) so a later pause/end cannot flicker it; a remount resets it.
+  const playing = ref(false);
+
+  // Honor the user's sound preference. Switch sound on by raising the volume, not by unMute(), when the player
+  // is already unmuted: a muted player buffers no audio, so unMute() mid-clip re-fetches the audio track and
+  // hitches the playhead. The pre-roll primes the audio (unMute at volume 0) so reveal only changes the volume.
+  function applyAudio(target: YTPlayer): void {
+    if (muted.value) {
+      target.mute();
+      return;
+    }
+    if (target.isMuted()) {
+      target.unMute();
+    }
+    target.setVolume(100);
+  }
+
+  // Hand the clip to the viewer. In prebuffer mode, seek to the exact clip start so every client sees the same
+  // segment; the muted pre-roll already buffered it, so this is a brief decoder re-prime the overlay hides.
+  // Immediate mode has no pre-roll, so this is the plain play path.
+  function play(): void {
+    cued = true;
+    if (!ready || !player) {
+      return;
+    }
+    if (prebuffer) {
+      player.seekTo(options.startSec, true);
+    }
+    applyAudio(player);
+    player.playVideo();
+  }
 
   onMounted(async () => {
     if (!options.videoId) {
@@ -105,19 +155,36 @@ export function useYouTube(options: YouTubeOptions): void {
         playsinline: 1,
         start: options.startSec,
         end: options.endSec,
-        mute: muted.value ? 1 : 0,
+        // Force mute while pre-buffering so the hidden pre-roll is silent; otherwise honor the user's toggle.
+        mute: prebuffer || muted.value ? 1 : 0,
         origin: window.location.origin,
       },
       events: {
         onReady: (event) => {
-          if (muted.value) {
+          ready = true;
+          if (prebuffer && !cued) {
             event.target.mute();
-          } else {
+            event.target.playVideo();
+            return;
+          }
+          applyAudio(event.target);
+          event.target.playVideo();
+        },
+        onStateChange: (event) => {
+          if (event.data !== YT_PLAYING) {
+            return;
+          }
+          // Prime the audio track during the hidden pre-roll for sound-on players: unmute but hold volume at 0
+          // so the audio buffers silently and reveal only has to raise the volume — no mid-clip unMute() hitch.
+          // Zero the volume before unmuting so no clip audio is audible in the gap between the two calls.
+          if (prebuffer && !cued && !muted.value && event.target.isMuted()) {
+            event.target.setVolume(0);
             event.target.unMute();
           }
-          // Start playback explicitly: a muted autoplay is always allowed, so this guarantees the segment
-          // plays even if the autoplay playerVar was not honored on creation.
-          event.target.playVideo();
+          // The handed-over clip is playing (past the seek re-prime) — let the caller drop its get-ready overlay.
+          if (cued) {
+            playing.value = true;
+          }
         },
         onError: (event) => {
           if (CLIP_ERROR_CODES.includes(event.data)) {
@@ -128,13 +195,11 @@ export function useYouTube(options: YouTubeOptions): void {
     });
   });
 
-  watch(muted, (value) => {
-    if (!player) return;
-    if (value) {
-      player.mute();
-    } else {
-      player.unMute();
-    }
+  watch(muted, () => {
+    // Keep the hidden pre-roll silent regardless of the toggle; honor it once the clip is live. A live unmute
+    // mid-clip re-fetches the audio and briefly hitches — that is the user's own action.
+    if (!player || !cued) return;
+    applyAudio(player);
   });
 
   onUnmounted(() => {
@@ -146,4 +211,6 @@ export function useYouTube(options: YouTubeOptions): void {
     }
     player = null;
   });
+
+  return { play, playing };
 }

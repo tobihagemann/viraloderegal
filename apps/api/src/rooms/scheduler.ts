@@ -2,6 +2,7 @@ import {
   type GameSettings,
   type GameSnapshot,
   type GameSource,
+  PREPARE_SEC,
   type PlayerGuess,
   type RoundPhase,
   type RoundResult,
@@ -59,7 +60,7 @@ interface VideoCandidate {
   snapshotRefreshedAt: Date | null;
 }
 
-// A candidate after the freshness resolve: the view count is the one beginClipRound persists onto the round.
+// A candidate after the freshness resolve: the view count is the one beginRound persists onto the round.
 interface SelectedVideo {
   youtubeId: string;
   clipStartSec: number;
@@ -186,7 +187,7 @@ async function startGameLocked(roomId: string, hostId: string, settings: GameSet
       })
       .returning('id')
       .executeTakeFirstOrThrow();
-    const round = await beginClipRound(trx, game.id, 1, roundsTotal, video);
+    const round = await beginRound(trx, game.id, 1, roundsTotal, video);
     await trx.updateTable('rooms').set({ active_game_id: game.id, status: 'active' }).where('id', '=', roomId).execute();
     return round.outcome;
   });
@@ -308,9 +309,10 @@ async function reportClipFailureLocked(roomId: string, playerId: string, roundId
     return { ok: false, error: 'invalid_round' };
   }
   const active = await selectActiveRound(db, roomId);
-  // Idempotency: only the active round still in its clip phase can be reported failed. A duplicate or stale
-  // report whose round was already replaced is a no-op, so it cannot cascade-skip the replacement clip.
-  if (!active || active.roundId !== roundId || active.currentPhase !== 'clip') {
+  // Idempotency: only the active round still cueing (prepare) or playing (clip) can be reported failed — the
+  // iframe cues during prepare, so an unembeddable clip surfaces its error before the clip window. A duplicate
+  // or stale report whose round was already replaced is a no-op, so it cannot cascade-skip the replacement.
+  if (!active || active.roundId !== roundId || (active.currentPhase !== 'prepare' && active.currentPhase !== 'clip')) {
     return { ok: false, error: 'invalid_round' };
   }
   // Pre-select the replacement before the transaction. The failing clip is still an active round here, so it
@@ -323,14 +325,14 @@ async function reportClipFailureLocked(roomId: string, playerId: string, roundId
   clearPhaseTimer(roomId);
   const outcome = await db.transaction().execute(async (trx): Promise<Outcome | null> => {
     const round = await selectActiveRound(trx, roomId);
-    if (!round || round.roundId !== roundId || round.currentPhase !== 'clip' || round.roundNo === null) {
+    if (!round || round.roundId !== roundId || (round.currentPhase !== 'prepare' && round.currentPhase !== 'clip') || round.roundNo === null) {
       return null;
     }
     await trx.updateTable('rounds').set({ state: 'skipped', round_no: null, phase_end_at: null }).where('id', '=', roundId).execute();
     if (!replacement) {
       return finalizeGame(trx, round.gameId, roomId);
     }
-    const { outcome } = await beginClipRound(trx, round.gameId, round.roundNo, round.roundsTotal, replacement);
+    const { outcome } = await beginRound(trx, round.gameId, round.roundNo, round.roundsTotal, replacement);
     return outcome;
   });
   if (outcome) {
@@ -388,9 +390,16 @@ async function advancePhaseLocked(roomId: string, expectedRoundId: string, expec
       // Begin the next round with the pre-resolved video; a null prepared video (final round, or the source
       // exhausted after the freshness resolve gated a member out) ends the game instead.
       if (round.roundNo !== null && round.roundNo < round.roundsTotal && preparedNext) {
-        const { outcome } = await beginClipRound(trx, round.gameId, round.roundNo + 1, round.roundsTotal, preparedNext);
+        const { outcome } = await beginRound(trx, round.gameId, round.roundNo + 1, round.roundsTotal, preparedNext);
         return outcome;
       }
+      return finalizeGame(trx, round.gameId, roomId);
+    }
+    // Auto-finish: the deterministic final round has no next round to tease, so skip its intermission and go
+    // straight from the final leaderboard to the end screen. Mark the round completed (mirroring the
+    // round-complete branch) first so finalizeGame's recap includes it.
+    if (advance === 'inter' && round.roundNo !== null && round.roundNo >= round.roundsTotal) {
+      await trx.updateTable('rounds').set({ state: 'completed', phase_end_at: null }).where('id', '=', round.roundId).execute();
       return finalizeGame(trx, round.gameId, roomId);
     }
     const durationSec = phaseDurationSec(advance, round.guessTimerSec, round.clipEndSec - round.clipStartSec);
@@ -404,16 +413,17 @@ async function advancePhaseLocked(roomId: string, expectedRoundId: string, expec
   }
 }
 
-// Insert a fresh clip round, point the game at it, and return the round event + clip-phase timer. Shared by
-// game start, the next-round advance, and clip-failure replacement.
-async function beginClipRound(
+// Insert a fresh round in its prepare phase, point the game at it, and return the round event + prepare-phase
+// timer. The client cues the player behind the get-ready overlay during prepare and starts playback when the
+// prepare→clip advance emits the clip phase event.
+async function beginRound(
   trx: Transaction<DB>,
   gameId: string,
   roundNo: number,
   roundsTotal: number,
   video: SelectedVideo,
 ): Promise<{ roundId: string; outcome: Outcome }> {
-  const delayMs = (video.clipEndSec - video.clipStartSec) * 1000;
+  const delayMs = PREPARE_SEC * 1000;
   const phaseEndAt = new Date(Date.now() + delayMs);
   const round = await trx
     .insertInto('rounds')
@@ -424,7 +434,7 @@ async function beginClipRound(
       clip_start_sec: video.clipStartSec,
       clip_end_sec: video.clipEndSec,
       view_count_snapshot: video.viewCount,
-      current_phase: 'clip',
+      current_phase: 'prepare',
       phase_end_at: phaseEndAt,
     })
     .returning('id')
@@ -438,10 +448,10 @@ async function beginClipRound(
     youtubeId: video.youtubeId,
     clipStartSec: video.clipStartSec,
     clipEndSec: video.clipEndSec,
-    phase: 'clip',
+    phase: 'prepare',
     phaseEndAt: phaseEndAt.toISOString(),
   };
-  return { roundId: round.id, outcome: { events: [event], next: { roundId: round.id, phase: 'clip', delayMs } } };
+  return { roundId: round.id, outcome: { events: [event], next: { roundId: round.id, phase: 'prepare', delayMs } } };
 }
 
 // Select the next video for a game and prepare it, both outside any transaction. Branches on the game's
@@ -552,12 +562,15 @@ async function buildLeaderboard(ex: DbExecutor, gameId: string, excludeRoundId?:
 }
 
 async function buildRoundResults(ex: DbExecutor, gameId: string): Promise<RoundResult[]> {
+  // Left join (like selectActiveRound) so a round whose source video was deleted still resolves; its recap
+  // title falls back to null. The game is over here, so revealing titles is safe.
   const rounds = await ex
     .selectFrom('rounds')
-    .select(['id', 'round_no', 'view_count_snapshot'])
+    .leftJoin('videos', 'videos.youtube_id', 'rounds.youtube_id')
+    .select(['rounds.id as id', 'rounds.round_no as round_no', 'rounds.view_count_snapshot as view_count_snapshot', 'videos.title_snapshot as title'])
     .where('game_id', '=', gameId)
     .where('round_no', 'is not', null)
-    .where('state', '=', 'completed')
+    .where('rounds.state', '=', 'completed')
     .orderBy('round_no')
     .execute();
   const results: RoundResult[] = [];
@@ -568,6 +581,7 @@ async function buildRoundResults(ex: DbExecutor, gameId: string): Promise<RoundR
     results.push({
       roundNo: round.round_no,
       viewCount: requireSnapshot(round.view_count_snapshot, round.id),
+      title: round.title,
       results: mapScores(await selectRoundScores(ex, round.id)),
     });
   }

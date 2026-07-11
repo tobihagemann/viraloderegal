@@ -7,7 +7,7 @@ import { useConnection } from '../composables/useConnection.js';
 import { clearSessionToken, readSessionToken } from '../composables/useStorage.js';
 import { useErrorText } from '../composables/useErrorText.js';
 import LobbyScreen from '../components/lobby/LobbyScreen.vue';
-import ClipPhase from '../components/game/ClipPhase.vue';
+import ClipStage from '../components/game/ClipStage.vue';
 import GuessInput from '../components/game/GuessInput.vue';
 import Intermission from '../components/game/Intermission.vue';
 import RevealSting from '../components/reveal/RevealSting.vue';
@@ -102,7 +102,7 @@ function leave(): void {
       <LobbyScreen v-if="viewMode === 'lobby'" />
       <EndScreen v-else-if="viewMode === 'end'" />
       <template v-else>
-        <ClipPhase v-if="store.phase === 'clip'" :key="store.round?.roundId" />
+        <ClipStage v-if="store.phase === 'prepare' || store.phase === 'clip'" :key="store.round?.roundId" />
         <GuessInput v-else-if="store.phase === 'guess'" />
         <RevealSting v-else-if="store.phase === 'reveal_sting'" />
         <RevealGuesses v-else-if="store.phase === 'reveal_guesses'" />

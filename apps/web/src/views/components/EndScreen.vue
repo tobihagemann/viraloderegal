@@ -44,14 +44,18 @@ function winners(results: { playerName: string; isWinner: boolean }[]): string {
           <table class="w-full text-left">
             <thead>
               <tr class="border-b border-neutral-950/10">
-                <th class="py-2 pr-3 text-sm font-medium whitespace-nowrap text-neutral-500">{{ t('leaderboard.rank') }}</th>
+                <th class="py-2 pr-3 text-sm font-medium whitespace-nowrap text-neutral-500">{{ t('end.round') }}</th>
+                <th class="px-3 py-2 text-sm font-medium whitespace-nowrap text-neutral-500">{{ t('end.video') }}</th>
                 <th class="px-3 py-2 text-sm font-medium whitespace-nowrap text-neutral-500">{{ t('reveal.viewCount') }}</th>
                 <th class="py-2 pl-3 text-sm font-medium whitespace-nowrap text-neutral-500">{{ t('reveal.winner') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="round in store.roundsHistory" :key="round.roundNo" class="border-b border-neutral-950/5">
-                <td class="py-2.5 pr-3 text-sm whitespace-nowrap text-neutral-700 tabular-nums">{{ t('end.roundLabel', { round: round.roundNo }) }}</td>
+                <td class="py-2.5 pr-3 text-sm whitespace-nowrap text-neutral-700 tabular-nums">{{ t('end.roundLabelShort', { round: round.roundNo }) }}</td>
+                <td class="px-3 py-2.5 text-sm text-neutral-700">
+                  <span class="block max-w-[12rem] truncate" :title="round.title ?? undefined">{{ round.title ?? '—' }}</span>
+                </td>
                 <td class="px-3 py-2.5 text-sm whitespace-nowrap text-neutral-900 tabular-nums">{{ format(round.viewCount) }}</td>
                 <td class="py-2.5 pl-3 text-sm whitespace-nowrap text-neutral-700">{{ winners(round.results) }}</td>
               </tr>

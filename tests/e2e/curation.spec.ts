@@ -152,14 +152,20 @@ test('a host plays a curated set in its order for exactly the set length', async
     expect(round.roundNo).toBe(i + 1);
     expect(round.roundsTotal).toBe(order.length);
     expect(round.youtubeId).toBe(order[i]);
+    // Consume the clip phase inserted after the prepare-phase round event, then the guess window.
+    await host.nextOfType('phase');
     await host.nextOfType('phase');
     host.send({ type: 'guess', value: SEEDED[i].views, final: true });
     guest.send({ type: 'guess', value: 0, final: true });
     await host.nextOfType('reveal');
     await host.nextOfType('leaderboard');
-    const inter = await host.nextOfType('phase');
-    expect(inter.phase).toBe('inter');
-    host.send({ type: 'skipIntermission' });
+    // The deterministic final set round (round_no === set length) auto-finishes: no intermission, straight
+    // to gameOver.
+    if (i < order.length - 1) {
+      const inter = await host.nextOfType('phase');
+      expect(inter.phase).toBe('inter');
+      host.send({ type: 'skipIntermission' });
+    }
   }
 
   const over = await host.nextOfType('gameOver');
@@ -192,11 +198,15 @@ test('a clip failure in a curated set draws the next member in order and ends wi
   const played: string[] = [];
   for (;;) {
     played.push(round.youtubeId);
+    // Consume the clip phase inserted after the prepare-phase round event, then the guess window.
+    await host.nextOfType('phase');
     await host.nextOfType('phase');
     host.send({ type: 'guess', value: 0, final: true });
     guest.send({ type: 'guess', value: 0, final: true });
     await host.nextOfType('reveal');
     await host.nextOfType('leaderboard');
+    // Mid-game pool exhaustion (round_no < rounds_total), not the deterministic final round, so the
+    // intermission still runs.
     expect((await host.nextOfType('phase')).phase).toBe('inter');
     host.send({ type: 'skipIntermission' });
     const next = await nextRoundOrOver(host);
@@ -258,11 +268,15 @@ test('deleting a curated set mid-game ends the game instead of falling back to t
   // selection sees a null set and ends the game rather than drawing a random clip.
   expect((await request.delete(`/api/admin/sets/${setId}`)).ok()).toBeTruthy();
 
+  // Consume the clip phase inserted after the prepare-phase round event, then the guess window.
+  await host.nextOfType('phase');
   await host.nextOfType('phase');
   host.send({ type: 'guess', value: 0, final: true });
   guest.send({ type: 'guess', value: 0, final: true });
   await host.nextOfType('reveal');
   await host.nextOfType('leaderboard');
+  // The set is deleted after round 1 (round_no 1 < rounds_total), so this is mid-game exhaustion, not the
+  // deterministic final round: the intermission still runs before the game ends.
   expect((await host.nextOfType('phase')).phase).toBe('inter');
   host.send({ type: 'skipIntermission' });
 
