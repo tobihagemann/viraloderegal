@@ -90,7 +90,7 @@ async function onMessage(session: Session, raw: RawData): Promise<void> {
     await dispatch(session, session.playerId, session.roomId, command);
   } catch (err) {
     console.error('Command handling failed:', err);
-    sendError(session.socket, 'internal_error', 'Something went wrong');
+    sendError(session.socket, 'internal', 'Something went wrong');
   }
 }
 

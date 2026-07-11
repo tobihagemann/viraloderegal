@@ -14,7 +14,6 @@ type IntentionallyGenericErrorCode =
   | 'already_joined'
   | 'bad_message'
   | 'internal'
-  | 'internal_error'
   | 'invalid_round'
   | 'invalid_source'
   | 'not_in_lobby'

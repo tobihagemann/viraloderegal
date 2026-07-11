@@ -15,7 +15,6 @@ export const WIRE_ERROR_CODES = [
   'config_missing',
   'empty',
   'internal',
-  'internal_error',
   'invalid_chars',
   'invalid_invitation',
   'invalid_request',
