@@ -19,6 +19,9 @@ interface YTPlayerEvent {
 }
 
 interface YTPlayerOptions {
+  // Serve the embed from youtube-nocookie.com (privacy-enhanced mode): YouTube then sets no tracking cookies
+  // until the viewer actually plays a clip, which is what our Datenschutz relies on.
+  host: string;
   videoId: string;
   width: string;
   height: string;
@@ -143,6 +146,7 @@ export function useYouTube(options: YouTubeOptions): { play: () => void; playing
     const mount = document.createElement('div');
     options.container.value.appendChild(mount);
     player = new YT.Player(mount, {
+      host: 'https://www.youtube-nocookie.com',
       videoId: options.videoId,
       width: '100%',
       height: '100%',

@@ -11,6 +11,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/videos', name: 'adminVideos', component: () => import('./views/admin/AdminVideosView.vue'), meta: { requiresAuth: true } },
   { path: '/admin/sets', name: 'adminSets', component: () => import('./views/admin/AdminSetsView.vue'), meta: { requiresAuth: true } },
   { path: '/admin/accept-invite/:invitationId', name: 'adminAcceptInvite', component: () => import('./views/AdminInviteAcceptView.vue'), props: true },
+  // The legally required German pages are bare public routes, viewable by anyone.
+  { path: '/impressum', name: 'impressum', component: () => import('./views/ImpressumView.vue') },
+  { path: '/privacy', name: 'privacy', component: () => import('./views/PrivacyView.vue') },
 ];
 
 export const router = createRouter({

@@ -54,6 +54,11 @@
   @apply rounded-lg bg-neutral-50 p-4;
 }
 
+/* Inline text link, applied as `link` in prose such as the legal pages. */
+@utility link {
+  @apply rounded-sm font-medium text-red-600 underline underline-offset-2 outline-red-600 outline-offset-2 hover:text-red-700 focus-visible:outline-2;
+}
+
 /* The YouTube iframe is generated at runtime, so its chrome (title, channel, share, "more videos", logo)
    can't be styled away with utilities. Overscan the iframe so that chrome — which sits in the edge strips —
    is cropped out by the container, and disable pointer events so players can't open the video, share it, or

@@ -13,6 +13,11 @@ export const de = {
     mute: 'Ton stummschalten',
     unmute: 'Ton einschalten',
   },
+  footer: {
+    nav: 'Rechtliches',
+    copyright: 'Tobias Hagemann',
+    sourceCode: 'Quellcode auf GitHub',
+  },
   home: {
     createTab: 'Erstellen',
     joinTab: 'Beitreten',
@@ -239,6 +244,64 @@ export const de = {
     already_active: 'Das Spiel läuft bereits.',
     kicked: 'Du wurdest aus dem Raum entfernt.',
     generic: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+  },
+  impressum: {
+    title: 'Impressum',
+    providerHeading: 'Angaben gemäß § 5 DDG',
+    name: 'Tobias Hagemann',
+    street: 'Rilkestraße 34',
+    city: '53225 Bonn',
+    contactHeading: 'Kontakt',
+    emailLabel: 'E-Mail',
+    email: "tobias.hagemann{'@'}gmail.com",
+    liabilityContentHeading: 'Haftung für Inhalte',
+    liabilityContent:
+      'Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.',
+    liabilityLinksHeading: 'Haftung für Links',
+    liabilityLinks:
+      'Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.',
+    copyrightHeading: 'Urheberrecht',
+    copyright:
+      'Die durch den Betreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Die eingebetteten YouTube-Videos sind Eigentum der jeweiligen Rechteinhaber.',
+    sourceNote: 'Viral oder Egal ist ein Open-Source-Projekt. Der Quellcode ist auf GitHub verfügbar:',
+    disputeHeading: 'Streitschlichtung',
+    dispute:
+      'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung bereit. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.',
+    privacyHeading: 'Datenschutz',
+    privacy: 'Informationen zur Verarbeitung personenbezogener Daten findest du in unserer',
+    privacyLink: 'Datenschutzerklärung',
+    updated: 'Stand: Juli 2026',
+  },
+  privacy: {
+    title: 'Datenschutz',
+    intro:
+      'Deine Privatsphäre ist uns wichtig. Diese Erklärung informiert dich darüber, welche personenbezogenen Daten bei der Nutzung von Viral oder Egal verarbeitet werden und wozu.',
+    controllerHeading: 'Verantwortlicher',
+    controller: 'Verantwortlich für die Verarbeitung personenbezogener Daten ist Tobias Hagemann. Die vollständigen Kontaktdaten findest du im',
+    hostingHeading: 'Hosting und Server-Logdateien',
+    hosting:
+      'Diese Anwendung wird auf einem virtuellen Server (VPS) der netcup GmbH (Daimlerstraße 25, 76185 Karlsruhe, Deutschland) gehostet; der Serverstandort ist Nürnberg (Deutschland). Beim Aufruf der Seite verarbeitet der Server technisch notwendige Zugriffsdaten, darunter deine IP-Adresse, den verwendeten Browser (User-Agent) und den Zeitpunkt des Zugriffs. Diese Daten sind erforderlich, um die Anwendung auszuliefern und den sicheren Betrieb zu gewährleisten (Art. 6 Abs. 1 lit. f DSGVO). Die Namensauflösung der Domain läuft über Cloudflare (Cloudflare, Inc., 101 Townsend Street, San Francisco, CA 94107, USA); dabei können Verbindungsdaten – auch in die USA – übertragen und verarbeitet werden. Die Verbindung ist per TLS verschlüsselt.',
+    gameDataHeading: 'Spieldaten',
+    gameData:
+      'Um mitzuspielen, gibst du einen frei gewählten Namen ein – ein Benutzerkonto ist nicht erforderlich, und es werden keine E-Mail-Adressen von Spielern erhoben. Während einer Partie speichert der Server den Raum-Code, deinen gewählten Namen, deine abgegebenen Tipps und den Punktestand. Diese Daten dienen ausschließlich dem Spielablauf und werden entfernt, wenn der Raum geschlossen wird.',
+    youtubeHeading: 'Eingebettete YouTube-Videos',
+    youtube:
+      'In der Anwendung werden Videoausschnitte über YouTube im erweiterten Datenschutzmodus (youtube-nocookie.com) eingebettet (Dienst der Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland). Sobald ein Clip geladen und abgespielt wird, stellt dein Browser eine Verbindung zu den Servern von YouTube bzw. Google her. Dabei werden Daten – unter anderem deine IP-Adresse – an Google übertragen. Im erweiterten Datenschutzmodus setzt YouTube erst dann Cookies, wenn ein Clip tatsächlich abgespielt wird. Diese Verarbeitung erfolgt in der Verantwortung von Google. Ohne das Abspielen der Clips ist das Spiel nicht möglich; die Einbettung ist daher für die Kernfunktion erforderlich.',
+    youtubePolicyIntro: 'Weitere Informationen zur Datenverarbeitung durch Google findest du in der',
+    youtubePolicyLink: 'Datenschutzerklärung von Google',
+    cookiesHeading: 'Cookies und lokale Speicherung',
+    cookies:
+      'Das Spiel selbst setzt keine Cookies zu Werbe- oder Analysezwecken. Einstellungen wie die Stummschaltung werden lokal in deinem Browser gespeichert (localStorage) und verlassen dein Gerät nicht. Der Adminbereich verwendet ein technisch notwendiges Cookie zur Anmeldung; er richtet sich ausschließlich an Betreiber. Die im erweiterten Datenschutzmodus eingebetteten YouTube-Videos setzen erst beim Abspielen eines Clips eigene Cookies.',
+    trackingHeading: 'Keine Analyse und kein Tracking',
+    tracking:
+      'Wir setzen keine Analyse-Tools, kein Tracking und keine Werbung ein. Es findet keine Auswertung deines Verhaltens und keine Profilbildung statt.',
+    rightsHeading: 'Deine Rechte',
+    rights:
+      'Dir stehen im Rahmen der geltenden gesetzlichen Bestimmungen die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch gegen die Verarbeitung deiner personenbezogenen Daten zu. Außerdem hast du das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren. Wende dich dazu an die im Impressum genannten Kontaktdaten.',
+    changesHeading: 'Änderungen dieser Datenschutzerklärung',
+    changes:
+      'Wir passen diese Datenschutzerklärung an, wenn sich die Anwendung oder die rechtlichen Anforderungen ändern. Es gilt die jeweils hier veröffentlichte Fassung.',
+    updated: 'Stand: Juli 2026',
   },
 } as const;
 

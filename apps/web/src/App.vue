@@ -28,5 +28,25 @@ const { t } = useI18n();
     <main class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
       <RouterView />
     </main>
+    <footer class="border-t border-neutral-950/10">
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <p>© {{ t('footer.copyright') }}</p>
+        <nav :aria-label="t('footer.nav')" class="flex flex-wrap gap-x-4 gap-y-1">
+          <RouterLink :to="{ name: 'impressum' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
+            t('impressum.title')
+          }}</RouterLink>
+          <RouterLink :to="{ name: 'privacy' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
+            t('privacy.title')
+          }}</RouterLink>
+          <a
+            href="https://github.com/tobihagemann/viraloderegal"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2"
+            >{{ t('footer.sourceCode') }}</a
+          >
+        </nav>
+      </div>
+    </footer>
   </div>
 </template>
