@@ -18,8 +18,8 @@ This is a [pnpm](https://pnpm.io) workspace on Node 22:
 
 ```sh
 pnpm install
-pnpm dev:db                 # start the local Postgres container
-pnpm migrate               # apply schema + seed the Phase-1 video pool
+pnpm dev:db                # start the local Postgres container
+pnpm migrate               # apply schema + seed the video pool
 pnpm dev                   # shared (watch) + api (:3000) + web dev server (:5173)
 curl localhost:3000/health # {"status":"ok","uptime":...}
 ```
@@ -42,7 +42,7 @@ Dev and test fall back to the local Compose stack, so a bare checkout boots with
 
 ## Database
 
-Schema lives in ordered, timestamp-named TypeScript migrations under `apps/api/migrations/`, applied by Kysely's `FileMigrationProvider` (run at boot via `tsx`). The `db` singleton and its hand-written table types live in `apps/api/src/db/kysely.ts` and reuse the shared enum unions so the type layer stays single-source. better-auth manages its own tables separately (Phase 2).
+Schema lives in ordered, timestamp-named TypeScript migrations under `apps/api/migrations/`, applied by Kysely's `FileMigrationProvider` (run at boot via `tsx`). The `db` singleton and its hand-written table types live in `apps/api/src/db/kysely.ts` and reuse the shared enum unions so the type layer stays single-source. better-auth manages its own tables separately.
 
 ## Deployment
 
