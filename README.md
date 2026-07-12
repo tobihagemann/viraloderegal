@@ -47,3 +47,7 @@ Schema lives in ordered, timestamp-named TypeScript migrations under `apps/api/m
 ## Deployment
 
 `docker build .` produces a single image that runs migrations on start, then serves the SPA, REST, and WebSocket on one port. `/health` backs the container healthcheck. `docker compose up` runs the app against a local Postgres.
+
+## License
+
+Released under the [MIT License](LICENSE).
