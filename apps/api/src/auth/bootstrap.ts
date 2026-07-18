@@ -12,35 +12,40 @@ const ORGANIZATION_SLUG = 'viraloderegal';
 // `disableSignUp` blocks server-side sign-up, so the account is created through better-auth's internal adapter
 // (session-free, not subject to the sign-up gate); the org/membership rows go through the generic adapter.
 // Invitations are org-scoped, so the org and an owner member must exist before the admin can issue any.
+// Tolerates an unreachable DB: a later boot re-runs the idempotent seed once Postgres is reachable.
 export async function seedBootstrap(): Promise<void> {
-  const ctx = await auth.$context;
+  try {
+    const ctx = await auth.$context;
 
-  const userId = await ensureCredentialUser(ctx, {
-    email: env.BOOTSTRAP_ADMIN_EMAIL,
-    name: 'Admin',
-    password: env.BOOTSTRAP_ADMIN_PASSWORD,
-    role: 'superadmin',
-  });
-
-  let org = await ctx.adapter.findOne<{ id: string }>({ model: 'organization', where: [{ field: 'slug', value: ORGANIZATION_SLUG }] });
-  if (!org) {
-    org = await ctx.adapter.create<{ name: string; slug: string; createdAt: Date }, { id: string }>({
-      model: 'organization',
-      data: { name: ORGANIZATION_NAME, slug: ORGANIZATION_SLUG, createdAt: new Date() },
+    const userId = await ensureCredentialUser(ctx, {
+      email: env.BOOTSTRAP_ADMIN_EMAIL,
+      name: 'Admin',
+      password: env.BOOTSTRAP_ADMIN_PASSWORD,
+      role: 'superadmin',
     });
-  }
 
-  const member = await ctx.adapter.findOne<{ id: string }>({
-    model: 'member',
-    where: [
-      { field: 'organizationId', value: org.id },
-      { field: 'userId', value: userId },
-    ],
-  });
-  if (!member) {
-    await ctx.adapter.create({
+    let org = await ctx.adapter.findOne<{ id: string }>({ model: 'organization', where: [{ field: 'slug', value: ORGANIZATION_SLUG }] });
+    if (!org) {
+      org = await ctx.adapter.create<{ name: string; slug: string; createdAt: Date }, { id: string }>({
+        model: 'organization',
+        data: { name: ORGANIZATION_NAME, slug: ORGANIZATION_SLUG, createdAt: new Date() },
+      });
+    }
+
+    const member = await ctx.adapter.findOne<{ id: string }>({
       model: 'member',
-      data: { organizationId: org.id, userId, role: 'owner', createdAt: new Date() },
+      where: [
+        { field: 'organizationId', value: org.id },
+        { field: 'userId', value: userId },
+      ],
     });
+    if (!member) {
+      await ctx.adapter.create({
+        model: 'member',
+        data: { organizationId: org.id, userId, role: 'owner', createdAt: new Date() },
+      });
+    }
+  } catch (err) {
+    console.error('Bootstrap admin seed skipped (database unreachable):', err);
   }
 }
