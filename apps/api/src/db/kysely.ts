@@ -125,6 +125,17 @@ export type DB = {
 // Exported so the auth layer reuses this single Pool (the API is the only DB client).
 export const pool = new Pool({ connectionString: env.DATABASE_URL });
 
+// A Postgres connection can fail out of band (restart, failover, network loss); pg surfaces it as an 'error'
+// event, and Node exits the process on an unhandled 'error'. Give every client a listener so neither an idle
+// client nor one checked out mid-query can crash us; pg discards the broken client and reconnects on the next
+// query. Log only err.message — the actionable reason — rather than the whole error object and its stack.
+pool.on('connect', (client) => {
+  client.on('error', (err) => console.error('Postgres client error:', err.message));
+});
+// pg-pool re-emits an idle client's error on the pool; the per-client listener already logged it, so this
+// only stops that duplicate from becoming an unhandled 'error' that would exit the process.
+pool.on('error', () => undefined);
+
 export const db = new Kysely<DB>({
   dialect: new PostgresDialect({ pool }),
 });
