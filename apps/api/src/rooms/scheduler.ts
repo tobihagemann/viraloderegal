@@ -68,7 +68,8 @@ interface SelectedVideo {
   viewCount: number;
 }
 
-// The reveal numbers become public when the guesses are revealed; the sting before them is still suspense.
+// The reveal numbers become public once the reveal phase starts; the guess window is already closed and
+// scored by then, so nothing in the payload is exploitable.
 const REVEAL_VISIBLE_PHASES: RoundPhase[] = ['reveal_guesses', 'reveal_board', 'inter'];
 
 // One phase timer per room, mirroring lifecycle.ts's graceTimers. Keyed by roomId and tagged with the
@@ -547,17 +548,12 @@ async function buildPhaseEvent(trx: Transaction<DB>, phase: RoundPhase, round: A
   return { type: 'phase', phase, phaseEndAt: iso };
 }
 
-async function buildLeaderboard(ex: DbExecutor, gameId: string, excludeRoundId?: string): Promise<Standing[]> {
-  let query = ex
+async function buildLeaderboard(ex: DbExecutor, gameId: string): Promise<Standing[]> {
+  const query = ex
     .selectFrom('round_scores')
     .innerJoin('rounds', 'rounds.id', 'round_scores.round_id')
     .select(['round_scores.player_name as playerName', 'round_scores.points as points'])
     .where('rounds.game_id', '=', gameId);
-  // The current round is scored at guess→reveal_sting, before its public reveal. Exclude it so a reconnect
-  // during reveal_sting cannot read the round's outcome off the standings ahead of the reveal sequence.
-  if (excludeRoundId) {
-    query = query.where('round_scores.round_id', '!=', excludeRoundId);
-  }
   return computeLeaderboard(await query.execute());
 }
 
@@ -759,8 +755,6 @@ export async function buildGameSnapshot(roomId: string, playerId: string): Promi
   const reveal = REVEAL_VISIBLE_PHASES.includes(round.currentPhase)
     ? { viewCount: requireSnapshot(round.viewCount, round.roundId), title: round.title, results: mapScores(await selectRoundScores(db, round.roundId)) }
     : null;
-  // The round is scored before its public reveal, so withhold it from the standings until the reveal runs.
-  const liveStandings = round.currentPhase === 'reveal_sting' ? await buildLeaderboard(db, game.id, round.roundId) : standings;
   return {
     phase: round.currentPhase,
     phaseEndAt: round.phaseEndAt ? round.phaseEndAt.toISOString() : null,
@@ -772,7 +766,7 @@ export async function buildGameSnapshot(roomId: string, playerId: string): Promi
       clipStartSec: round.clipStartSec,
       clipEndSec: round.clipEndSec,
     },
-    standings: liveStandings,
+    standings,
     yourGuess: myGuess?.guess ?? null,
     reveal,
     rounds,

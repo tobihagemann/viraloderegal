@@ -10,7 +10,6 @@ import LobbyScreen from '../components/lobby/LobbyScreen.vue';
 import ClipStage from '../components/game/ClipStage.vue';
 import GuessInput from '../components/game/GuessInput.vue';
 import Intermission from '../components/game/Intermission.vue';
-import RevealSting from '../components/reveal/RevealSting.vue';
 import RevealGuesses from '../components/reveal/RevealGuesses.vue';
 import Leaderboard from '../components/reveal/Leaderboard.vue';
 import EndScreen from './components/EndScreen.vue';
@@ -104,7 +103,6 @@ function leave(): void {
       <template v-else>
         <ClipStage v-if="store.phase === 'prepare' || store.phase === 'clip'" :key="store.round?.roundId" />
         <GuessInput v-else-if="store.phase === 'guess'" />
-        <RevealSting v-else-if="store.phase === 'reveal_sting'" />
         <RevealGuesses v-else-if="store.phase === 'reveal_guesses'" />
         <Leaderboard v-else-if="store.phase === 'reveal_board'" />
         <Intermission v-else-if="store.phase === 'inter'" />

@@ -34,10 +34,9 @@ export type RoundsTotal = (typeof ROUNDS_TOTAL_OPTIONS)[number];
  * overlay and start the instant the clip phase begins (no black frame on a short clip). */
 export const PREPARE_SEC = 3;
 
-/** Reveal sub-phase and pacing durations in seconds: a brief suspense sting, then longer windows to read
- * the per-guess results and the updated leaderboard. */
-export const REVEAL_STING_SEC = 3;
-export const REVEAL_GUESSES_SEC = 8;
+/** Reveal pacing durations in seconds. The reveal phase spans the client's whole reveal choreography —
+ * suspense build, sting, and read time for the per-guess results; the board phase shows the leaderboard. */
+export const REVEAL_GUESSES_SEC = 15;
 export const REVEAL_BOARD_SEC = 5;
 export const INTERMISSION_SEC = 30;
 
@@ -69,7 +68,7 @@ export type GameSource = (typeof GAME_SOURCES)[number];
 export const GAME_STATUSES = ['active', 'finished'] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
-export const ROUND_PHASES = ['prepare', 'clip', 'guess', 'reveal_sting', 'reveal_guesses', 'reveal_board', 'inter'] as const;
+export const ROUND_PHASES = ['prepare', 'clip', 'guess', 'reveal_guesses', 'reveal_board', 'inter'] as const;
 export type RoundPhase = (typeof ROUND_PHASES)[number];
 
 export const ROUND_STATES = ['active', 'completed', 'skipped'] as const;

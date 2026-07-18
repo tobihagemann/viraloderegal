@@ -298,7 +298,7 @@ test('a reconnect during the prepare phase resumes the get-ready round without l
   back.close();
 });
 
-test('a reconnect during reveal_sting withholds the just-scored round from the snapshot standings', async ({ request }) => {
+test('a reconnect during reveal_guesses resumes with the reveal payload and the scored standings', async ({ request }) => {
   test.setTimeout(120_000);
   const { host, guest, hostToken } = await readyRoom(request, '130', '131');
 
@@ -310,10 +310,9 @@ test('a reconnect during reveal_sting withholds the just-scored round from the s
   expect(guessPhase.phase).toBe('guess');
   host.send({ type: 'guess', value: VIEW_COUNTS[round.youtubeId] });
 
-  // The round is scored when the guess window closes into reveal_sting; pause the room in that suspense
-  // window, before the public reveal, then reconnect.
-  const sting = await host.nextOfType('phase');
-  expect(sting.phase).toBe('reveal_sting');
+  // The guess window closes straight into the reveal: scoring and the public payload land together. Pause
+  // the room mid-reveal, then reconnect.
+  const reveal = await host.nextOfType('reveal');
   host.close();
   guest.close();
   await host.closed;
@@ -322,10 +321,11 @@ test('a reconnect during reveal_sting withholds the just-scored round from the s
   const back = await openWs();
   back.send({ type: 'join', sessionToken: hostToken });
   const snapshot = await back.nextOfType('snapshot');
-  expect(snapshot.game?.phase).toBe('reveal_sting');
-  expect(snapshot.game?.reveal).toBeNull();
-  // The just-scored round must not leak into the standings ahead of the reveal sequence.
-  expect(snapshot.game?.standings.every((s) => s.totalPoints === 0)).toBe(true);
+  expect(snapshot.game?.phase).toBe('reveal_guesses');
+  // The resumed reveal carries the full answer and the just-scored round already counts in the standings.
+  expect(snapshot.game?.reveal?.viewCount).toBe(reveal.viewCount);
+  expect(snapshot.game?.reveal?.title).toBe(EXPECTED_TITLES[round.youtubeId]);
+  expect(snapshot.game?.standings.find((s) => s.playerName === 'Alice')?.totalPoints).toBe(1);
 
   back.close();
 });
