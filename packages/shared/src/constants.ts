@@ -51,7 +51,7 @@ export const YOUTUBE_ID_LENGTH = 11;
  * client-side and the videos CHECK constraint enforces server-side.
  */
 export const CLIP_MIN_DURATION_SEC = 3;
-export const CLIP_MAX_DURATION_SEC = 15;
+export const CLIP_MAX_DURATION_SEC = 30;
 
 /**
  * Upper bound for a guess. The client validates input live and the server

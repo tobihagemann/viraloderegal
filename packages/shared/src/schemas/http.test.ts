@@ -52,12 +52,12 @@ describe('videoUpsertSchema', () => {
 
   it('accepts a segment at the minimum and maximum lengths', () => {
     expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 13 }).success).toBe(true);
-    expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 25 }).success).toBe(true);
+    expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 40 }).success).toBe(true);
   });
 
-  it('rejects a segment shorter than 3s or longer than 15s', () => {
+  it('rejects a segment shorter than 3s or longer than 30s', () => {
     expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 12 }).success).toBe(false);
-    expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 26 }).success).toBe(false);
+    expect(videoUpsertSchema.safeParse({ ...base, clipStartSec: 10, clipEndSec: 41 }).success).toBe(false);
   });
 
   it('rejects an id that is not 11 characters or uses an off-alphabet character', () => {
