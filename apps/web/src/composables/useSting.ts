@@ -136,8 +136,19 @@ function stop(): void {
   setTimeout(() => master.disconnect(), 250);
 }
 
-export function useSting(): { play: () => void } {
+export function useSting(): { play: () => void; warm: () => void } {
   const muted = useMute();
+
+  // Spin the context and output chain up ahead of play(): a cold AudioContext takes tens to hundreds of ms to
+  // actually render (resume plus output-hardware spin-up), which lets the wall-clock-driven reveal animation
+  // run ahead of the first sting. Warmed even while muted, so unmuting mid-suspense still gets a running context.
+  function warm(): void {
+    const ac = context();
+    if (ac.state !== 'running') {
+      void ac.resume();
+    }
+    outputChain(ac);
+  }
 
   // Honor the global toggle mid-sting, matching the clip player's live mute behavior.
   watch(muted, (isMuted) => {
@@ -151,10 +162,8 @@ export function useSting(): { play: () => void } {
     if (muted.value) {
       return;
     }
+    warm();
     const ac = context();
-    if (ac.state !== 'running') {
-      void ac.resume();
-    }
     stop();
 
     const { compressor, reverb, wet } = outputChain(ac);
@@ -181,5 +190,5 @@ export function useSting(): { play: () => void } {
     }, 300);
   }
 
-  return { play };
+  return { play, warm };
 }

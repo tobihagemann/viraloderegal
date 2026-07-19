@@ -9,7 +9,7 @@ import PhaseHeader from '../game/PhaseHeader.vue';
 
 const { store } = useGameState();
 const { t } = useI18n();
-const { play } = useSting();
+const { play, warm } = useSting();
 
 const formatter = new Intl.NumberFormat('de-DE');
 const format = (value: number): string => formatter.format(value);
@@ -31,6 +31,7 @@ const timers: ReturnType<typeof setTimeout>[] = [];
 // state silently.
 const elapsedMs = REVEAL_GUESSES_SEC * 1000 - (new Date(store.phaseEndAt ?? '').getTime() - Date.now());
 if (Number.isFinite(elapsedMs) && elapsedMs < SUSPENSE_MS + Math.max(...STING_NOTE_TIMES_MS)) {
+  warm();
   timers.push(setTimeout(play, SUSPENSE_MS));
   STING_NOTE_TIMES_MS.forEach((noteMs, i) => timers.push(setTimeout(() => (step.value = i + 1), SUSPENSE_MS + AUDIO_LEAD_MS + noteMs)));
 } else {

@@ -180,10 +180,13 @@ export function useYouTube(options: YouTubeOptions): { play: () => void; playing
           }
           // Prime the audio track during the hidden pre-roll for sound-on players: unmute but hold volume at 0
           // so the audio buffers silently and reveal only has to raise the volume — no mid-clip unMute() hitch.
-          // Zero the volume before unmuting so no clip audio is audible in the gap between the two calls.
+          // The unmute transition clamps the volume up to a small audible floor even when it was zeroed just
+          // before, so the volume must be re-zeroed after unMute() — a setVolume(0) on an already-unmuted
+          // player does stick, keeping the pre-roll silent.
           if (prebuffer && !cued && !muted.value && event.target.isMuted()) {
             event.target.setVolume(0);
             event.target.unMute();
+            event.target.setVolume(0);
           }
           // The handed-over clip is playing (past the seek re-prime) — let the caller drop its get-ready overlay.
           if (cued) {
