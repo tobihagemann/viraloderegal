@@ -49,9 +49,10 @@ test('host and guest play a full game through the UI and start a rematch', async
   const host = await hostContext.newPage();
   const guest = await guestContext.newPage();
 
-  // Host creates a room and lands in its lobby.
+  // Host creates a room and lands in its lobby. The start screen defaults to the join tab, so switch to create first.
   await host.goto('/');
   await host.getByLabel('Dein Name').fill('Alice');
+  await host.getByRole('tab', { name: 'Erstellen' }).click();
   await host.getByRole('button', { name: 'Raum erstellen' }).click();
   await expect(host).toHaveURL(/\/room\/[A-Z0-9]{6}$/);
   const code = host.url().split('/').pop() ?? '';

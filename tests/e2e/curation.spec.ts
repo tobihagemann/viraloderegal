@@ -368,6 +368,7 @@ test('a host picking a curated set hides the round selector and runs the set len
 
   await host.goto('/');
   await host.getByLabel('Dein Name').fill('Alice');
+  await host.getByRole('tab', { name: 'Erstellen' }).click();
   await host.getByRole('button', { name: 'Raum erstellen' }).click();
   await expect(host).toHaveURL(/\/room\/[A-Z0-9]{6}$/);
   const code = host.url().split('/').pop() ?? '';
