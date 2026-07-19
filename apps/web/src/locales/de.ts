@@ -2,7 +2,7 @@
 export const de = {
   app: {
     title: 'Viral oder Egal',
-    tagline: 'Errate die YouTube-Aufrufe und schlage deine Freunde.',
+    tagline: 'Errate die YouTube-Aufrufe besser als deine Freunde.',
   },
   common: {
     back: 'Zurück',
@@ -17,6 +17,10 @@ export const de = {
     nav: 'Rechtliches',
     copyright: 'Tobias Hagemann',
     sourceCode: 'Quellcode auf GitHub',
+    inspiredPrefix: 'Inspiriert vom legendären Ratespiel',
+    inspiredGame: 'Viral oder Egal',
+    inspiredMiddle: 'aus dem ehemaligen',
+    inspiredShow: 'NEO MAGAZIN ROYALE',
   },
   home: {
     createTab: 'Erstellen',
@@ -28,7 +32,7 @@ export const de = {
     codeLabel: 'Raum-Code',
     codePlaceholder: 'ABC123',
     createButton: 'Raum erstellen',
-    joinButton: 'Beitreten',
+    joinButton: 'Raum beitreten',
   },
   lobby: {
     heading: 'Lobby',

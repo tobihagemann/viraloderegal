@@ -29,23 +29,52 @@ const { t } = useI18n();
       <RouterView />
     </main>
     <footer class="border-t border-neutral-950/10">
-      <div class="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-6 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p>© {{ t('footer.copyright') }}</p>
-        <nav :aria-label="t('footer.nav')" class="flex flex-wrap gap-x-4 gap-y-1">
-          <RouterLink :to="{ name: 'impressum' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
-            t('impressum.title')
-          }}</RouterLink>
-          <RouterLink :to="{ name: 'privacy' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
-            t('privacy.title')
-          }}</RouterLink>
+      <div class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6 text-sm text-neutral-500 sm:px-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            ©
+            <a
+              href="https://tobiha.de/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2"
+              >{{ t('footer.copyright') }}</a
+            >
+          </p>
+          <nav :aria-label="t('footer.nav')" class="flex flex-wrap gap-x-4 gap-y-1">
+            <RouterLink :to="{ name: 'impressum' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
+              t('impressum.title')
+            }}</RouterLink>
+            <RouterLink :to="{ name: 'privacy' }" class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2">{{
+              t('privacy.title')
+            }}</RouterLink>
+            <a
+              href="https://github.com/tobihagemann/viraloderegal"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2"
+              >{{ t('footer.sourceCode') }}</a
+            >
+          </nav>
+        </div>
+        <p class="text-xs text-pretty text-neutral-400">
+          {{ t('footer.inspiredPrefix') }}
           <a
-            href="https://github.com/tobihagemann/viraloderegal"
+            href="https://www.youtube.com/watch?v=WZgXo-xfS5A&list=PLHeo4sayeLKquxYPYoElpGcjPi-60sIkf"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2"
-            >{{ t('footer.sourceCode') }}</a
+            >{{ t('footer.inspiredGame') }}</a
           >
-        </nav>
+          {{ t('footer.inspiredMiddle') }}
+          <a
+            href="https://de.wikipedia.org/wiki/Neo_Magazin_Royale"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-sm outline-red-600 outline-offset-2 hover:text-neutral-900 focus-visible:outline-2"
+            >{{ t('footer.inspiredShow') }}</a
+          >.
+        </p>
       </div>
     </footer>
   </div>

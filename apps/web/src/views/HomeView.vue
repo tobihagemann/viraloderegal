@@ -22,7 +22,7 @@ const resolveError = useErrorText();
 
 // One intent at a time: the active tab keeps the name field adjacent to the chosen path's fields and shows a
 // single primary action, instead of two competing paths around a detached name field.
-const tab = ref<'create' | 'join'>('create');
+const tab = ref<'create' | 'join'>('join');
 const name = ref('');
 const code = ref('');
 const submitting = ref(false);
@@ -143,23 +143,18 @@ function onSubmit(): void {
       <TabsRoot v-model="tab" class="flex flex-col gap-5">
         <TabsList class="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1">
           <TabsTrigger
-            value="create"
-            class="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 outline-red-600 outline-offset-2 focus-visible:outline-2 data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs"
-          >
-            {{ t('home.createTab') }}
-          </TabsTrigger>
-          <TabsTrigger
             value="join"
             class="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 outline-red-600 outline-offset-2 focus-visible:outline-2 data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs"
           >
             {{ t('home.joinTab') }}
           </TabsTrigger>
+          <TabsTrigger
+            value="create"
+            class="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 outline-red-600 outline-offset-2 focus-visible:outline-2 data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-xs"
+          >
+            {{ t('home.createTab') }}
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="create" class="flex flex-col gap-4 focus:outline-none">
-          <p class="text-sm text-pretty text-neutral-600">{{ t('home.createSubtitle') }}</p>
-          <button type="submit" class="btn btn-primary" :disabled="!nameValid || submitting">{{ t('home.createButton') }}</button>
-        </TabsContent>
 
         <TabsContent value="join" class="flex flex-col gap-4 focus:outline-none">
           <p class="text-sm text-pretty text-neutral-600">{{ t('home.joinSubtitle') }}</p>
@@ -177,6 +172,11 @@ function onSubmit(): void {
             />
           </div>
           <button type="submit" class="btn btn-primary" :disabled="!nameValid || !codeComplete || submitting">{{ t('home.joinButton') }}</button>
+        </TabsContent>
+
+        <TabsContent value="create" class="flex flex-col gap-4 focus:outline-none">
+          <p class="text-sm text-pretty text-neutral-600">{{ t('home.createSubtitle') }}</p>
+          <button type="submit" class="btn btn-primary" :disabled="!nameValid || submitting">{{ t('home.createButton') }}</button>
         </TabsContent>
       </TabsRoot>
 
