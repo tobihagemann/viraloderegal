@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#ffffff"/>
+
+  <!-- brand logo, scaled from the 64x64 favicon: bars with a tall red center bar -->
+  <g transform="translate(600 150) scale(3.4) translate(-32 -33)">
+    <g fill="#a3a3a3">
+      <rect x="6" y="42" width="8" height="12" rx="4"/>
+      <rect x="17" y="32" width="8" height="22" rx="4"/>
+      <rect x="39" y="32" width="8" height="22" rx="4"/>
+      <rect x="50" y="42" width="8" height="12" rx="4"/>
+    </g>
+    <rect x="28" y="12" width="8" height="42" rx="4" fill="#dc2626"/>
+  </g>
+
+  <text x="600" y="400" text-anchor="middle"
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif" font-weight="700"
+    font-size="88" letter-spacing="-2" fill="#171717">Viral oder Egal</text>
+
+  <text x="600" y="470" text-anchor="middle"
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif" font-weight="400"
+    font-size="36" fill="#525252">Errate die YouTube-Aufrufe besser als deine Freunde.</text>
+
+  <text x="600" y="556" text-anchor="middle"
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif" font-weight="600"
+    font-size="30" letter-spacing="1" fill="#dc2626">viraloderegal.de</text>
+
+  <rect x="0" y="622" width="1200" height="8" fill="#dc2626"/>
+</svg>
