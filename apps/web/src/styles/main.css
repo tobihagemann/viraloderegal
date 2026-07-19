@@ -59,16 +59,17 @@
   @apply rounded-sm font-medium text-red-600 underline underline-offset-2 outline-red-600 outline-offset-2 hover:text-red-700 focus-visible:outline-2;
 }
 
-/* The YouTube iframe is generated at runtime, so its chrome (title, channel, share, "more videos", logo)
-   can't be styled away with utilities. Overscan the iframe so that chrome — which sits in the edge strips —
-   is cropped out by the container, and disable pointer events so players can't open the video, share it, or
-   pause into the related-videos overlay (any of which would leak the real view count). */
+/* Crop YouTube's runtime-generated chrome (title, channel, share, "more videos", logo) — which can't be styled
+   away with utilities — out of the edge strips the container clips. ClipStage renders the iframe at a large fixed
+   logical width and scales it down (see there for why), so this one gentle overscan value clears the chrome at
+   every viewport. Pointer events are disabled so players can't open the video, share it, or pause into the
+   related-videos overlay (any of which would leak the real view count). */
 .clip-frame iframe {
   position: absolute;
-  top: -20%;
-  left: -20%;
-  width: 140%;
-  height: 140%;
+  top: -5.5%;
+  left: -5.5%;
+  width: 111%;
+  height: 111%;
   border: 0;
   pointer-events: none;
 }

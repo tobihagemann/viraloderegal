@@ -10,6 +10,7 @@ interface YTPlayer {
   setVolume(volume: number): void;
   playVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
+  unloadModule(module: string): void;
   destroy(): void;
 }
 
@@ -52,6 +53,19 @@ declare global {
 // removed/private, and embedding disabled. Transient network failures use other codes and are not in this
 // set, so a YouTube outage does not cascade-skip every round.
 const CLIP_ERROR_CODES = [2, 5, 100, 101, 150];
+
+// Force captions off. With the gentle clip overscan the caption strip isn't cropped, and cc_load_policy can only
+// force captions on — so the module has to be unloaded. The module id differs across the HTML5 and legacy
+// players, and unloading one that never loaded can throw, so try both defensively.
+function disableCaptions(target: YTPlayer): void {
+  for (const module of ['captions', 'cc']) {
+    try {
+      target.unloadModule(module);
+    } catch {
+      // ignore: the module may not be loaded
+    }
+  }
+}
 
 let apiPromise: Promise<YTNamespace> | null = null;
 
@@ -166,6 +180,7 @@ export function useYouTube(options: YouTubeOptions): { play: () => void; playing
       events: {
         onReady: (event) => {
           ready = true;
+          disableCaptions(event.target);
           if (prebuffer && !cued) {
             event.target.mute();
             event.target.playVideo();
@@ -178,6 +193,8 @@ export function useYouTube(options: YouTubeOptions): { play: () => void; playing
           if (event.data !== YT_PLAYING) {
             return;
           }
+          // Captions can finish loading after onReady, so re-assert them off on every play.
+          disableCaptions(event.target);
           // Prime the audio track during the hidden pre-roll for sound-on players: unmute but hold volume at 0
           // so the audio buffers silently and reveal only has to raise the volume — no mid-clip unMute() hitch.
           // The unmute transition clamps the volume up to a small audible floor even when it was zeroed just

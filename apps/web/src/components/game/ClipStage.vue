@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useGameState } from '../../composables/useGameState.js';
 import { useConnection } from '../../composables/useConnection.js';
@@ -15,6 +15,39 @@ const { t } = useI18n();
 const round = store.round;
 const container = ref<HTMLElement | null>(null);
 let reported = false;
+
+// The iframe is laid out at a large fixed logical width so YouTube's roughly fixed-pixel chrome (title, channel,
+// logo) is a small fraction of it, letting the gentle overscan in `.clip-frame iframe` crop those edge strips
+// with barely any zoom. `transform: scale()` (visual only — it doesn't change the iframe's internal layout size)
+// shrinks the render back into the actual slot, so one overscan value clears the chrome at every viewport width.
+const CLIP_LOGICAL_WIDTH = 1920;
+const slot = ref<HTMLElement | null>(null);
+const renderScale = ref(0);
+let resizeObserver: ResizeObserver | null = null;
+
+const renderStyle = computed(() => ({
+  width: `${CLIP_LOGICAL_WIDTH}px`,
+  height: `${(CLIP_LOGICAL_WIDTH * 9) / 16}px`,
+  transform: `scale(${renderScale.value})`,
+}));
+
+onMounted(() => {
+  const measure = (): void => {
+    if (slot.value) {
+      renderScale.value = slot.value.clientWidth / CLIP_LOGICAL_WIDTH;
+    }
+  };
+  measure();
+  if (slot.value) {
+    resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(slot.value);
+  }
+});
+
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
 
 // Only the host swaps a broken clip, and only once: a duplicate report is a server no-op, but guarding here
 // avoids a needless second frame. The player cues during prepare, so an embed error can surface then too.
@@ -56,8 +89,11 @@ watch(
       <h1 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{{ t('game.clipHeading') }}</h1>
       <p class="mt-2 text-base text-pretty text-neutral-600">{{ t('game.clipSubtitle') }}</p>
     </div>
-    <div class="clip-frame relative aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-neutral-950/10">
-      <div ref="container" class="absolute inset-0"></div>
+    <div ref="slot" class="clip-frame relative aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 ring-1 ring-neutral-950/10">
+      <!-- Large logical render, scaled down to the slot (see the script) so the overscan barely zooms. -->
+      <div class="absolute top-0 left-0 origin-top-left overflow-hidden" :style="renderStyle">
+        <div ref="container" class="absolute inset-0"></div>
+      </div>
       <!-- Opaque get-ready overlay: the hidden pre-roll plays the video (whose frame/title are part of the
            answer) behind it, so it must fully cover the frame until the clip is truly playing — held past the
            countdown until `playing` latches so the seek re-prime at the clip start stays hidden. -->
