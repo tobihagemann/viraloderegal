@@ -70,6 +70,32 @@ test('host and guest play a full game through the UI and start a rematch', async
   await expect(host.getByText('Alice')).toBeVisible();
   await expect(host.getByText('Bob')).toBeVisible({ timeout: 15_000 });
 
+  // An invalid draft must keep the editor open with its message rather than closing and silently dropping it.
+  await guest.getByRole('button', { name: 'Namen ändern' }).click();
+  const nameField = guest.getByRole('textbox', { name: 'Namen ändern' });
+  await nameField.fill('ab');
+  await nameField.press('Enter');
+  await expect(guest.getByText('Der Name ist zu kurz (mindestens 3 Zeichen).')).toBeVisible();
+  await expect(nameField).toBeVisible();
+
+  // The check button is the pointer counterpart to the Enter path above.
+  await expect(guest.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  await nameField.fill('Bobbie');
+  await guest.getByRole('button', { name: 'Speichern' }).click();
+  await expect(nameField).toHaveCount(0);
+  await expect(host.getByText('Bobbie')).toBeVisible({ timeout: 15_000 });
+
+  // Cancelling discards the draft: only re-opening the editor can observe that, since a closed row renders
+  // the committed name either way. Escape is the keyboard path.
+  await guest.getByRole('button', { name: 'Namen ändern' }).click();
+  await guest.getByRole('textbox', { name: 'Namen ändern' }).fill('Discarded');
+  await guest.getByRole('textbox', { name: 'Namen ändern' }).press('Escape');
+  await expect(host.getByText('Discarded')).toHaveCount(0);
+  await guest.getByRole('button', { name: 'Namen ändern' }).click();
+  await expect(guest.getByRole('textbox', { name: 'Namen ändern' })).toHaveValue('Bobbie');
+  await guest.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(guest.getByText('Bobbie')).toBeVisible();
+
   // Host configures the shortest game and starts it.
   await setSelect(host, 'Runden', '3');
   await setSelect(host, 'Rate-Zeit', '15 Sek.');

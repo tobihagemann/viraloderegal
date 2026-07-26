@@ -298,7 +298,7 @@ test('an admin reaches the videos workspace and sees the seeded pool', async ({ 
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await expect(page).toHaveURL(/\/admin$/);
 
-  await page.getByRole('link', { name: 'Videos verwalten' }).click();
+  await page.getByRole('link', { name: /^Videos/ }).click();
   await expect(page).toHaveURL(/\/admin\/videos$/);
   await expect(page.getByText('Despacito')).toBeVisible({ timeout: 15_000 });
 
@@ -306,6 +306,63 @@ test('an admin reaches the videos workspace and sees the seeded pool', async ({ 
   await page.getByRole('button', { name: 'Suchen' }).click();
   await expect(page.getByText('Gangnam Style')).toBeVisible();
   await expect(page.getByText('Despacito')).toHaveCount(0);
+
+  await context.close();
+});
+
+test('an admin edits a video through the dialog and the list picks the change up', async ({ browser }) => {
+  // A distinct forwarded IP isolates this UI sign-in's rate-limit bucket (see signInAdmin).
+  const context = await browser.newContext({ extraHTTPHeaders: ip('170') });
+  const page = await context.newPage();
+
+  await page.goto('/admin/login');
+  await page.getByLabel('E-Mail').fill(ADMIN_EMAIL);
+  await page.getByLabel('Passwort').fill(ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Anmelden' }).click();
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 30_000 });
+  await page.getByRole('link', { name: /^Videos/ }).click();
+  await expect(page).toHaveURL(/\/admin\/videos$/);
+
+  // The off-alphabet id is the same length as a valid one, so the disabled assertion only holds if the id check
+  // validates the alphabet, not just the length.
+  await page.getByRole('button', { name: 'Neues Video' }).click();
+  await expect(page.getByRole('heading', { name: 'Neues Video' })).toBeVisible();
+  const newId = page.getByLabel('YouTube-ID');
+  const save = page.getByRole('button', { name: 'Speichern' });
+  await expect(newId).toHaveValue('');
+  await expect(newId).toBeEnabled();
+  await expect(save).toBeDisabled();
+  await page.getByLabel('Clip-Start (Sek.)').fill('0');
+  await page.getByLabel('Clip-Ende (Sek.)').fill('10');
+  await newId.fill('E2EUPSERT01');
+  await expect(save).toBeEnabled();
+  await newId.fill('kJQP7kiw5F!');
+  await expect(save).toBeDisabled();
+  // Escape exercises reka-ui's own dismissal, which routes through FormDialog's update:open relay rather
+  // than the form's close emit.
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Neues Video' })).toHaveCount(0);
+
+  // Only the notes are touched, and only on the dedicated upsert fixture, so no other spec's expectations move.
+  const row = page.getByRole('row').filter({ hasText: 'Fixture Upsert Target' });
+  await row.getByRole('button', { name: 'Bearbeiten' }).click();
+  await expect(page.getByRole('heading', { name: 'Video bearbeiten' })).toBeVisible();
+  await expect(page.getByLabel('YouTube-ID')).toHaveValue('E2EUPSERT01');
+  await expect(page.getByLabel('YouTube-ID')).toBeDisabled();
+
+  const note = `e2e-${Date.now()}`;
+  await page.getByLabel('Notizen').fill(note);
+  // The reload the dialog's close kicks off is fire-and-forget, so wait on the response itself before
+  // re-opening — otherwise the second open can read the pre-save row and fail unrecoverably.
+  const reloaded = page.waitForResponse((res) => res.url().includes('/api/admin/videos?') && res.status() === 200);
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.getByRole('heading', { name: 'Video bearbeiten' })).toHaveCount(0, { timeout: 15_000 });
+  await reloaded;
+
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Bearbeiten' }).click();
+  await expect(page.getByLabel('Notizen')).toHaveValue(note);
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
 
   await context.close();
 });
@@ -321,15 +378,30 @@ test('an admin builds, reorders, edits, and deletes a curated set through the UI
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await expect(page).toHaveURL(/\/admin$/);
 
-  await page.getByRole('link', { name: 'Sets verwalten' }).click();
+  await page.getByRole('link', { name: /^Sets/ }).click();
   await expect(page).toHaveURL(/\/admin\/sets$/);
 
-  // The picker preloads the seeded pool on mount; add two known videos, then reorder them.
+  // The library preloads the seeded pool when the dialog opens.
+  await page.getByRole('button', { name: 'Neues Set' }).click();
   await expect(page.getByText('Despacito')).toBeVisible({ timeout: 15_000 });
   const setName = `UI-Set-${Date.now()}`;
   await page.getByLabel('Name').fill(setName);
   await page.getByRole('listitem').filter({ hasText: 'Despacito' }).getByRole('button', { name: 'Hinzufügen' }).click();
   await page.getByRole('listitem').filter({ hasText: 'Gangnam Style' }).getByRole('button', { name: 'Hinzufügen' }).click();
+
+  // The set is savable here, so a stray native submit would save and close — only at this point can the
+  // dialog-still-open assertion actually fail. The library is scoped by its add buttons, since both added
+  // videos also appear in the "Im Set" column.
+  await expect(page.getByRole('button', { name: 'Speichern' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Hinzufügen' })).not.toHaveCount(0);
+  await page.getByLabel('Videos suchen').fill('Despacito');
+  await page.getByLabel('Videos suchen').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Neues Set' })).toBeVisible();
+  // Despacito is the sole match and is already in the set, so it renders a check, not an add button.
+  await expect(page.getByRole('button', { name: 'Hinzufügen' })).toHaveCount(0);
+  await page.getByLabel('Videos suchen').fill('');
+  await page.getByRole('button', { name: 'Suchen' }).click();
+  await expect(page.getByRole('button', { name: 'Hinzufügen' })).not.toHaveCount(0);
   // The move buttons exist only in the ordered list, so the first one targets it unambiguously.
   await page.getByRole('button', { name: 'Nach unten' }).first().click();
   await page.getByRole('button', { name: 'Speichern' }).click();
@@ -339,9 +411,10 @@ test('an admin builds, reorders, edits, and deletes a curated set through the UI
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(row).toContainText('2 Runden');
 
-  // Editing loads the set back into the form.
   await row.getByRole('button', { name: 'Bearbeiten' }).click();
   await expect(page.getByLabel('Name')).toHaveValue(setName);
+  // The dialog is modal, so the list underneath is unreachable until it closes.
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
 
   // Deleting removes it from the list.
   await row.getByRole('button', { name: 'Löschen' }).click();
@@ -350,7 +423,7 @@ test('an admin builds, reorders, edits, and deletes a curated set through the UI
   await context.close();
 });
 
-test('a host picking a curated set hides the round selector and runs the set length', async ({ browser, request }) => {
+test('a host picking a curated set sees the set-derived round count and runs the set length', async ({ browser, request }) => {
   test.setTimeout(120_000);
   await signInAdmin(request, '167');
   const setName = `UI-${Date.now()}`;
@@ -380,12 +453,18 @@ test('a host picking a curated set hides the round selector and runs the set len
   await guest.getByRole('button', { name: 'Beitreten' }).click();
   await expect(host.getByText('Bob')).toBeVisible({ timeout: 15_000 });
 
-  // The round selector shows for the default random source; choosing the set hides it (round count = set
-  // length). reka-ui labels the source trigger with its aria-label "Quelle".
-  await expect(host.locator('[aria-label="Runden"]')).toBeVisible();
+  // reka-ui labels the source trigger with its aria-label "Quelle", so it is not reachable by role.
+  await expect(host.getByRole('combobox', { name: 'Runden' })).toBeVisible();
   await host.locator('[aria-label="Quelle"]').click();
   await host.getByRole('option', { name: setName, exact: true }).click();
-  await expect(host.locator('[aria-label="Runden"]')).toHaveCount(0);
+  await expect(host.getByRole('combobox', { name: 'Runden' })).toHaveCount(0);
+  await expect(host.getByRole('status', { name: 'Runden' })).toHaveText(String(SEEDED.length));
+
+  await host.locator('[aria-label="Quelle"]').click();
+  await host.getByRole('option', { name: 'Zufällig', exact: true }).click();
+  await expect(host.getByRole('combobox', { name: 'Runden' })).toBeVisible();
+  await host.locator('[aria-label="Quelle"]').click();
+  await host.getByRole('option', { name: setName, exact: true }).click();
 
   const start = host.getByRole('button', { name: 'Spiel starten' });
   await expect(start).toBeEnabled({ timeout: 15_000 });

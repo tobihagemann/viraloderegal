@@ -9,7 +9,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
 <template>
   <SelectRoot :model-value="modelValue" @update:model-value="$emit('update:modelValue', String($event))">
     <SelectTrigger :aria-label="label" class="field flex items-center justify-between gap-2 text-left">
-      <SelectValue />
+      <SelectValue class="block min-w-0 truncate" />
       <ChevronDownIcon class="size-4 shrink-0 text-neutral-500" />
     </SelectTrigger>
     <SelectPortal>

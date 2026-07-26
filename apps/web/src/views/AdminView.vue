@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { ArrowRightIcon } from '@heroicons/vue/16/solid';
 import { useI18n } from 'vue-i18n';
 import { authClient } from '../auth/client.js';
 import { useErrorText } from '../composables/useErrorText.js';
@@ -51,39 +52,62 @@ async function onSignOut(): Promise<void> {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-md flex-col gap-8">
+  <div class="mx-auto flex w-full max-w-2xl flex-col gap-8">
     <div class="flex items-start justify-between gap-4">
-      <div>
+      <div class="min-w-0">
         <h1 class="text-2xl font-semibold tracking-tight">{{ t('admin.heading') }}</h1>
         <p class="mt-1 text-sm text-neutral-600">{{ t('admin.greeting', { email: session.data?.user.email ?? '' }) }}</p>
       </div>
-      <button type="button" class="btn btn-secondary" @click="onSignOut">{{ t('admin.signOut') }}</button>
+      <button type="button" class="btn btn-secondary shrink-0" @click="onSignOut">{{ t('admin.signOut') }}</button>
     </div>
 
-    <nav class="flex flex-col gap-2">
-      <RouterLink :to="{ name: 'adminVideos' }" class="btn btn-secondary justify-between"
-        >{{ t('adminNav.videos') }}<span aria-hidden="true">→</span></RouterLink
+    <nav class="grid gap-4 sm:grid-cols-2">
+      <RouterLink
+        :to="{ name: 'adminVideos' }"
+        class="card flex flex-col gap-1 outline-red-600 outline-offset-2 hover:ring-neutral-950/20 focus-visible:outline-2"
       >
-      <RouterLink :to="{ name: 'adminSets' }" class="btn btn-secondary justify-between">{{ t('adminNav.sets') }}<span aria-hidden="true">→</span></RouterLink>
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-neutral-900">{{ t('adminNav.videos') }}</h2>
+          <ArrowRightIcon class="size-4 shrink-0 text-neutral-400" />
+        </div>
+        <p class="text-sm text-pretty text-neutral-600">{{ t('adminNav.videosDescription') }}</p>
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'adminSets' }"
+        class="card flex flex-col gap-1 outline-red-600 outline-offset-2 hover:ring-neutral-950/20 focus-visible:outline-2"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-neutral-900">{{ t('adminNav.sets') }}</h2>
+          <ArrowRightIcon class="size-4 shrink-0 text-neutral-400" />
+        </div>
+        <p class="text-sm text-pretty text-neutral-600">{{ t('adminNav.setsDescription') }}</p>
+      </RouterLink>
     </nav>
 
-    <form class="flex flex-col gap-4" @submit.prevent="onInvite">
-      <h2 class="text-lg font-medium">{{ t('admin.inviteHeading') }}</h2>
+    <section class="flex flex-col gap-4 border-t border-neutral-950/10 pt-8">
       <div>
-        <label for="invite-email" class="block text-sm font-medium text-neutral-700">{{ t('admin.inviteEmailLabel') }}</label>
-        <input
-          id="invite-email"
-          v-model="inviteEmail"
-          name="invite-email"
-          type="email"
-          autocomplete="off"
-          :placeholder="t('admin.inviteEmailPlaceholder')"
-          class="field mt-1.5"
-        />
+        <h2 class="text-lg font-medium">{{ t('admin.teamHeading') }}</h2>
+        <p class="mt-1 text-sm text-pretty text-neutral-600">{{ t('admin.teamSubtitle') }}</p>
       </div>
-      <button type="submit" class="btn btn-primary" :disabled="!organizationId || !inviteEmail || submitting">{{ t('admin.inviteSubmit') }}</button>
-      <p v-if="inviteSent" class="text-center text-sm text-neutral-600">{{ inviteSent }}</p>
-      <p v-if="inviteError" class="text-center text-sm text-red-600">{{ inviteError }}</p>
-    </form>
+      <form class="flex flex-col gap-3 sm:flex-row sm:items-end" @submit.prevent="onInvite">
+        <div class="min-w-0 flex-1">
+          <label for="invite-email" class="block text-sm font-medium text-neutral-700">{{ t('admin.inviteEmailLabel') }}</label>
+          <input
+            id="invite-email"
+            v-model="inviteEmail"
+            name="invite-email"
+            type="email"
+            autocomplete="off"
+            :placeholder="t('admin.inviteEmailPlaceholder')"
+            class="field mt-1.5"
+          />
+        </div>
+        <button type="submit" class="btn btn-secondary shrink-0" :disabled="!organizationId || !inviteEmail || submitting">
+          {{ t('admin.inviteSubmit') }}
+        </button>
+      </form>
+      <p v-if="inviteSent" class="text-sm text-neutral-600">{{ inviteSent }}</p>
+      <p v-if="inviteError" class="text-sm text-red-600">{{ inviteError }}</p>
+    </section>
   </div>
 </template>

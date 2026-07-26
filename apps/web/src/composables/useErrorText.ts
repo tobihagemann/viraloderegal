@@ -21,6 +21,24 @@ export function errorCode(data: unknown): DisplayErrorCode {
     : 'generic';
 }
 
+export type JsonResult<T> = { ok: true; data: T } | { ok: false; code: DisplayErrorCode };
+
+export async function requestJson<T>(url: string, init?: RequestInit): Promise<JsonResult<T>> {
+  try {
+    const res = await fetch(url, init);
+    if (!res.ok) {
+      return { ok: false, code: errorCode(await res.json().catch(() => null)) };
+    }
+    return { ok: true, data: (await res.json()) as T };
+  } catch {
+    return { ok: false, code: 'generic' };
+  }
+}
+
+export function postJson<T>(url: string, body: unknown): Promise<JsonResult<T>> {
+  return requestJson<T>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+}
+
 // Resolve a server or validation error code to a localized message, scanning the ERROR_NAMESPACES in order
 // before falling back to a generic message. Codes are narrowed to DisplayErrorCode at their boundaries (REST
 // bodies, ws error events, URL handoffs), so the lookup keys off the shared vocabulary; the typed t/te are

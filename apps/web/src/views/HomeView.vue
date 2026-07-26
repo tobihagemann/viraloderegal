@@ -57,7 +57,9 @@ watch(code, (value) => {
   }
 });
 
-async function postJson(path: string, body: unknown): Promise<{ status: number; data: unknown }> {
+// Distinct from the shared `postJson` in useErrorText: the room routes are keyed on the status code
+// (201 create vs 200 join), so this returns the raw status and body instead of the decoded error contract.
+async function postForStatus(path: string, body: unknown): Promise<{ status: number; data: unknown }> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -72,7 +74,7 @@ async function onCreate(): Promise<void> {
   submitting.value = true;
   formError.value = null;
   try {
-    const { status, data } = await postJson('/rooms', { name: submittedName.value });
+    const { status, data } = await postForStatus('/rooms', { name: submittedName.value });
     if (status === 201) {
       const room = createRoomResponseSchema.parse(data);
       storeSessionToken(room.code, room.sessionToken);
@@ -93,7 +95,7 @@ async function onJoin(): Promise<void> {
   formError.value = null;
   try {
     const normalizedCode = roomCodeSchema.parse(code.value);
-    const { status, data } = await postJson('/rooms/join', { code: normalizedCode, name: submittedName.value });
+    const { status, data } = await postForStatus('/rooms/join', { code: normalizedCode, name: submittedName.value });
     if (status === 200) {
       const joined = joinRoomResponseSchema.parse(data);
       storeSessionToken(normalizedCode, joined.sessionToken);

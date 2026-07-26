@@ -12,6 +12,19 @@ const port = Number(process.env.E2E_YOUTUBE_PORT);
 // regression). See seed-fixtures.ts for how each is used.
 const FAIL_IDS = new Set(['E2EFAILVC01', 'E2ESTALEA01', 'E2ESTALEB02']);
 
+// An admin upsert re-fetches metadata before writing, so the UI save path needs one id that resolves. A
+// dedicated fixture id (mirroring seed-fixtures.ts) keeps the seeded counts other specs assert untouched.
+const SUCCESS_ITEMS = new Map([
+  [
+    'E2EUPSERT01',
+    {
+      snippet: { title: 'Fixture Upsert Target', channelTitle: 'Fixture Channel' },
+      contentDetails: { duration: 'PT1M40S' },
+      statistics: { viewCount: '333333' },
+    },
+  ],
+]);
+
 // Per-id cumulative request counters. No reset endpoint: specs assert on before/after deltas so the shared
 // server stays race-free across parallel specs and CI retries.
 const counts = new Map();
@@ -41,9 +54,13 @@ const server = createServer((req, res) => {
       json(res, 500, { error: { message: 'fake youtube error' } });
       return;
     }
-    // Mirror the real API: any other id yields an empty result. No fixture needs a success item — every e2e
-    // fixture is a fail-id and the seeded pool is fresh (never re-fetched). An empty result is safe either way:
-    // resolveFreshSnapshot falls back to the stored snapshot, and an upsert of an unknown id maps to video_not_found.
+    const item = SUCCESS_ITEMS.get(id);
+    if (item) {
+      json(res, 200, { items: [item] });
+      return;
+    }
+    // Mirror the real API: any other id yields an empty result. That is safe either way — resolveFreshSnapshot
+    // falls back to the stored snapshot, and an upsert of an unknown id maps to video_not_found.
     json(res, 200, { items: [] });
     return;
   }

@@ -12,9 +12,9 @@ const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://viraloderegal:viral
 // it on every run, returning a reused local e2e DB to the stale state the specs require (idempotent).
 const STALE_AT = '2020-01-01T00:00:00Z';
 
-// All three are fail-500 fixtures on the fake server (a 500 counts the fetch attempt but never persists a
-// fresh timestamp, so they stay stale across CI retries) and random_eligible: false so they never enter the
-// random draw. Their stored view counts are the source of truth (the specs mirror these literals):
+// All are random_eligible: false so they never enter the random draw. The first three are fail-500 fixtures on
+// the fake server (a 500 counts the fetch attempt but never persists a fresh timestamp, so they stay stale
+// across CI retries). Their stored view counts are the source of truth (the specs mirror these literals):
 //   E2EFAILVC01 — branch #1's refresh target: the fake 500s → stored-snapshot fallback returns this count.
 //   E2ESTALEA01 — branch #3's control clip: stale, so the game-start fetch fires (and 500s, staying stale).
 //   E2ESTALEB02 — branch #3's replacement clip: a clip-failure replacement must NOT fetch it even though it
@@ -23,6 +23,9 @@ const FIXTURES = [
   { youtube_id: 'E2EFAILVC01', title: 'Fixture Refresh Fallback', view_count: 123_456_789 },
   { youtube_id: 'E2ESTALEA01', title: 'Fixture Stale Control', view_count: 111_111 },
   { youtube_id: 'E2ESTALEB02', title: 'Fixture Stale Replacement', view_count: 222_222 },
+  // The admin UI's upsert target: the only id the fake server resolves successfully, so the video dialog's
+  // save path is reachable.
+  { youtube_id: 'E2EUPSERT01', title: 'Fixture Upsert Target', view_count: 333_333 },
 ];
 
 export default async function globalSetup(): Promise<void> {

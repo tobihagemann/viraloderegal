@@ -11,6 +11,7 @@ import {
 } from '@viraloderegal/shared';
 import { useGameState } from '../../composables/useGameState.js';
 import { useConnection } from '../../composables/useConnection.js';
+import { requestJson } from '../../composables/useErrorText.js';
 import SettingsSelect from './SettingsSelect.vue';
 
 // The end screen reuses this start path for a rematch, only relabeling the action.
@@ -34,19 +35,17 @@ const sourceOptions = computed(() => [
   { value: 'random', label: t('settings.sourceRandom') },
   ...sets.value.map((set) => ({ value: set.id, label: set.name })),
 ]);
-const isSet = computed(() => source.value !== 'random');
+// `source` only ever holds 'random' or an id from `sets`, so a non-null match means a set is selected.
+const selectedSet = computed(() => sets.value.find((set) => set.id === source.value) ?? null);
 
 const canStart = computed(() => store.lobby?.canStart ?? false);
 
 onMounted(async () => {
-  try {
-    const res = await fetch('/api/sets');
-    if (res.ok) {
-      sets.value = (await res.json()) as CuratedSetSummary[];
-    }
-  } catch {
-    // A failed set fetch leaves the random pool available; the host just sees no curated options.
+  const result = await requestJson<CuratedSetSummary[]>('/api/sets');
+  if (result.ok) {
+    sets.value = result.data;
   }
+  // A failed set fetch leaves the random pool available; the host just sees no curated options.
 });
 
 function start(): void {
@@ -54,8 +53,8 @@ function start(): void {
   // A set start sends a placeholder roundsTotal (required by the schema); the server derives the real round
   // count from the set length. A random start sends the chosen round count and no set id.
   const settings = gameSettingsSchema.parse(
-    isSet.value
-      ? { source: 'set', curatedSetId: source.value, roundsTotal: DEFAULT_ROUNDS_TOTAL, guessTimerSec: Number(timer.value) }
+    selectedSet.value
+      ? { source: 'set', curatedSetId: selectedSet.value.id, roundsTotal: DEFAULT_ROUNDS_TOTAL, guessTimerSec: Number(timer.value) }
       : { source: 'random', roundsTotal: Number(rounds.value), guessTimerSec: Number(timer.value) },
   );
   send({ type: 'start', settings });
@@ -66,18 +65,22 @@ function start(): void {
   <div class="card flex flex-col gap-5">
     <h2 class="text-base font-semibold">{{ t('settings.heading') }}</h2>
 
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1.5">
         <p class="text-sm font-medium text-neutral-700">{{ t('settings.source') }}</p>
         <SettingsSelect v-model="source" :options="sourceOptions" :label="t('settings.source')" />
       </div>
-      <div v-if="!isSet" class="flex flex-col gap-1.5">
-        <p class="text-sm font-medium text-neutral-700">{{ t('settings.rounds') }}</p>
-        <SettingsSelect v-model="rounds" :options="roundOptions" :label="t('settings.rounds')" />
-      </div>
-      <div class="flex flex-col gap-1.5">
-        <p class="text-sm font-medium text-neutral-700">{{ t('settings.timer') }}</p>
-        <SettingsSelect v-model="timer" :options="timerOptions" :label="t('settings.timer')" />
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="flex flex-col gap-1.5">
+          <p class="text-sm font-medium text-neutral-700">{{ t('settings.rounds') }}</p>
+          <SettingsSelect v-if="!selectedSet" v-model="rounds" :options="roundOptions" :label="t('settings.rounds')" />
+          <!-- `output` (role=status) so the derived value carries an accessible name; `p` prohibits aria-label. -->
+          <output v-else class="field-static block tabular-nums" :aria-label="t('settings.rounds')">{{ selectedSet.roundCount }}</output>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <p class="text-sm font-medium text-neutral-700">{{ t('settings.timer') }}</p>
+          <SettingsSelect v-model="timer" :options="timerOptions" :label="t('settings.timer')" />
+        </div>
       </div>
     </div>
 
