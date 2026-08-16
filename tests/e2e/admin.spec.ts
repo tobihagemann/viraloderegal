@@ -9,7 +9,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // better-auth's mutating org endpoints enforce a same-origin check that the browser sets automatically but
 // the API request fixture does not, so the invite call passes it explicitly. It must match BETTER_AUTH_URL.
-const ORIGIN = `http://localhost:${process.env.E2E_PORT ?? '3000'}`;
+const ORIGIN = `http://localhost:${process.env.E2E_PORT ?? '28759'}`;
 
 test('unauthenticated access to /admin redirects to the login', async ({ browser }) => {
   const context = await browser.newContext();
