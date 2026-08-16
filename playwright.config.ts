@@ -1,10 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Default to 3000; E2E_PORT overrides it so the suite can run on a free port when another local server
-// already holds 3000.
-const port = process.env.E2E_PORT ?? '3000';
+// The e2e twin of the dev web port; E2E_PORT overrides it.
+const port = process.env.E2E_PORT ?? '28759';
 // The fake YouTube server's port; E2E_YOUTUBE_PORT overrides it (matched by the fakeYoutubeCount helper).
-const fakePort = process.env.E2E_YOUTUBE_PORT ?? '3100';
+const fakePort = process.env.E2E_YOUTUBE_PORT ?? '28752';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -48,7 +47,7 @@ export default defineConfig({
         // wsjoin:127.0.0.1 loopback bucket; raise the limit (not a disable) so a suite run never trips it.
         WS_JOIN_RATE_LIMIT: '5000',
         WEB_DIST_DIR: 'apps/web/dist',
-        DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal',
+        DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:18753/viraloderegal',
         // Redirect YouTube egress to the loopback fake so specs observe outbound calls; the dummy key clears
         // the client's key check (which precedes the fetch), and the env guard admits this loopback base URL.
         YOUTUBE_TRANSPORT: 'fake',

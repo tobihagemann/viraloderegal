@@ -7,7 +7,7 @@ export const isProduction = process.env.NODE_ENV === 'production';
 
 const requiredInProd = (devDefault: string) => (isProduction ? z.string().min(1) : z.string().min(1).default(devDefault));
 
-const DEV_DATABASE_URL = 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal';
+const DEV_DATABASE_URL = 'postgres://viraloderegal:viraloderegal@localhost:18753/viraloderegal';
 // better-auth documents a high-entropy ≥32-char secret. The dev default must itself be ≥32 chars or this
 // module throws at import (reddening Vitest, which loads the app before migrate).
 const DEV_BETTER_AUTH_SECRET = 'dev-better-auth-secret-change-me-0123456789';
@@ -15,7 +15,7 @@ const DEV_BETTER_AUTH_SECRET = 'dev-better-auth-secret-change-me-0123456789';
 const envSchema = z
   .object({
     DATABASE_URL: requiredInProd(DEV_DATABASE_URL),
-    PORT: z.coerce.number().int().positive().default(3000),
+    PORT: z.coerce.number().int().positive().default(18752),
     // Per-IP ws-join allowance per RATE_WINDOW_MS, more generous than the REST join bucket so a flaky-network
     // player reconnecting to their own game is never locked out. Env-overridable so the e2e harness can raise it.
     WS_JOIN_RATE_LIMIT: z.coerce.number().int().positive().default(30),
@@ -42,7 +42,7 @@ const envSchema = z
     // a bare checkout still boots. The secret must be ≥32 chars per better-auth.
     BETTER_AUTH_SECRET: isProduction ? z.string().min(32) : z.string().min(32).default(DEV_BETTER_AUTH_SECRET),
     // Base URL better-auth uses to build invite/callback links.
-    BETTER_AUTH_URL: requiredInProd('http://localhost:3000'),
+    BETTER_AUTH_URL: requiredInProd('http://localhost:18752'),
     SMTP_HOST: requiredInProd('localhost'),
     SMTP_PORT: isProduction ? z.coerce.number().int().positive() : z.coerce.number().int().positive().default(587),
     SMTP_USER: requiredInProd('viraloderegal'),

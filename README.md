@@ -20,8 +20,8 @@ This is a [pnpm](https://pnpm.io) workspace on Node 22:
 pnpm install
 pnpm dev:db                # start the local Postgres container
 pnpm migrate               # apply schema + seed the video pool
-pnpm dev                   # shared (watch) + api (:3000) + web dev server (:5173)
-curl localhost:3000/health # {"status":"ok","uptime":...}
+pnpm dev                   # shared (watch) + api (:18752) + web dev server (:18759)
+curl localhost:18752/health # {"status":"ok","uptime":...}
 ```
 
 Dev and test fall back to the local Compose stack, so a bare checkout boots with zero config; copy `.env.example` to `.env` only to override.

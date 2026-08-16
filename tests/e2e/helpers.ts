@@ -73,7 +73,7 @@ export async function connect(token: string): Promise<{ ws: WsClient; playerId: 
 
 // The fake YouTube server's cumulative (never-reset) request count for an id; callers assert before/after deltas.
 export async function fakeYoutubeCount(id: string): Promise<number> {
-  const res = await fetch(`http://localhost:${process.env.E2E_YOUTUBE_PORT ?? '3100'}/__count?id=${id}`);
+  const res = await fetch(`http://localhost:${process.env.E2E_YOUTUBE_PORT ?? '28752'}/__count?id=${id}`);
   const body = (await res.json()) as { count: number };
   return body.count;
 }

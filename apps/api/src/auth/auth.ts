@@ -25,7 +25,7 @@ export const auth = betterAuth({
   // In dev the SPA is served from Vite on a separate origin and proxies auth calls here, so that origin must
   // be trusted for better-auth's same-origin check on cookie POSTs; in production the API serves the SPA
   // same-origin, so baseURL already covers it.
-  trustedOrigins: isProduction ? undefined : ['http://localhost:5173'],
+  trustedOrigins: isProduction ? undefined : ['http://localhost:18759'],
   // Key the rate limiter off the app-resolved trusted IP (injected on TRUSTED_IP_HEADER in app.ts) instead of
   // better-auth's default leftmost-X-Forwarded-For read, which a client can spoof.
   advanced: { ipAddress: { ipAddressHeaders: [TRUSTED_IP_HEADER] } },

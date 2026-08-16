@@ -48,7 +48,7 @@ jobs:
           NODE_ENV=production
           VIRALODEREGAL_IMAGE=viraloderegal:ci
           BETTER_AUTH_SECRET=ci-smoke-better-auth-secret-0123456789
-          BETTER_AUTH_URL=http://localhost:3000
+          BETTER_AUTH_URL=http://localhost:18752
           MAIL_TRANSPORT=json
           SMTP_HOST=localhost
           SMTP_PORT=587
@@ -61,7 +61,7 @@ jobs:
           # Tear the stack down even if the health wait or curl fails, so nothing is left running.
           trap 'docker compose -f docker-compose.prod.yml down -v' EXIT
           docker compose -f docker-compose.prod.yml up -d --wait --wait-timeout 120
-          curl -fsS http://localhost:3000/health
+          curl -fsS http://localhost:18752/health
       # Re-run with push (fully cached from the build above) to publish the real tags only after the smoke test passed.
       - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:

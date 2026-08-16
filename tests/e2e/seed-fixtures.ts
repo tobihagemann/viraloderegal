@@ -6,7 +6,7 @@ import pg from 'pg';
 // env-gated seed can never later populate a reused DB and its results would be environment-dependent. Living
 // outside the migration chain, these fixtures never reach production. Runs once as Playwright's globalSetup,
 // after CI's migrate step has created the schema. Resolves DATABASE_URL exactly as the webServer entry does.
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:5432/viraloderegal';
+const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://viraloderegal:viraloderegal@localhost:18753/viraloderegal';
 
 // Far older than SNAPSHOT_TTL_MS, so resolveFreshSnapshot treats every fixture as stale. The DO UPDATE resets
 // it on every run, returning a reused local e2e DB to the stale state the specs require (idempotent).

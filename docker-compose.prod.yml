@@ -7,19 +7,19 @@ services:
     # Both sides parameterized so a PORT override keeps the host mapping on the container's actual port.
     # TLS is terminated by the reverse proxy (Traefik) in front of this.
     ports:
-      - '127.0.0.1:${HOST_PORT:-3000}:${PORT:-3000}'
+      - '127.0.0.1:${HOST_PORT:-18752}:${PORT:-18752}'
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      # Derive the port from $PORT (default 3000) and hit /health without adding curl/wget.
+      # Derive the port from $PORT (default 18752) and hit /health without adding curl/wget.
       test:
         [
           'CMD',
           'node',
           '-e',
-          "const p=process.env.PORT||3000;fetch('http://localhost:'+p+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "const p=process.env.PORT||18752;fetch('http://localhost:'+p+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
