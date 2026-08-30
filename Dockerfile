@@ -30,7 +30,7 @@ COPY --from=build /app/deploy ./
 COPY --from=build /app/apps/web/dist /app/web
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
-# Documents the default PORT; the runtime honors $PORT if overridden.
-EXPOSE 3000
+# Mirrors the PORT default in apps/api/src/env.ts, which is what a deployment that sets no PORT listens on.
+EXPOSE 18752
 USER node
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

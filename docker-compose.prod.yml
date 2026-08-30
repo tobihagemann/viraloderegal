@@ -4,23 +4,18 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-    # Both sides parameterized so a PORT override keeps the host mapping on the container's actual port.
+      # env_file .env may also carry PORT; this entry wins, so the container's port is fixed here.
+      PORT: 3000
     # TLS is terminated by the reverse proxy (Traefik) in front of this.
     ports:
-      - '127.0.0.1:${HOST_PORT:-18752}:${PORT:-18752}'
+      - '127.0.0.1:${HOST_PORT:-18752}:3000'
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      # Derive the port from $PORT (default 18752) and hit /health without adding curl/wget.
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "const p=process.env.PORT||18752;fetch('http://localhost:'+p+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      # node -e because the image ships no curl or wget.
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
