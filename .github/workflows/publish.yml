@@ -36,6 +36,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # The smoke test below sets PORT and WEB_DIST_DIR in the compose environment: block, so it can never
+      # catch the image losing its own defaults. Assert those against the built image config, since a
+      # deployment that overrides neither (and the EXPOSE the Dockerfile advertises) depends on them.
+      - name: Assert the image's declared defaults
+        run: |
+          config=$(docker image inspect viraloderegal:ci --format '{{json .Config}}')
+          for pair in PORT=3000 WEB_DIST_DIR=/app/web NODE_ENV=production; do
+            echo "$config" | jq -e --arg p "$pair" '.Env | index($p)' > /dev/null \
+              || { echo "image is missing ENV $pair"; exit 1; }
+          done
+          echo "$config" | jq -e '.ExposedPorts["3000/tcp"]' > /dev/null \
+            || { echo "image is missing EXPOSE 3000"; exit 1; }
       # Run the built image through the prod compose against a throwaway Postgres: proves the entrypoint's
       # deploy chain (tsx + dist/db/migrate.js + bundled migrations) runs and the app reports healthy.
       - name: Smoke-test the deploy chain
