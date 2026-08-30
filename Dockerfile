@@ -25,12 +25,14 @@ RUN pnpm --filter @viraloderegal/api deploy --prod --legacy /app/deploy
 FROM base AS runner
 ENV NODE_ENV=production
 ENV WEB_DIST_DIR=/app/web
+# Fixes the image's listen port instead of letting it fall through to the PORT default in
+# apps/api/src/env.ts, which is a dev value free to move.
+ENV PORT=3000
 WORKDIR /app/api
 COPY --from=build /app/deploy ./
 COPY --from=build /app/apps/web/dist /app/web
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
-# Mirrors the PORT default in apps/api/src/env.ts, which is what a deployment that sets no PORT listens on.
-EXPOSE 18752
+EXPOSE 3000
 USER node
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
