@@ -47,6 +47,10 @@ jobs:
           DATABASE_URL=postgres://viraloderegal:viraloderegal@postgres:5432/viraloderegal
           NODE_ENV=production
           VIRALODEREGAL_IMAGE=viraloderegal:ci
+          # The values a .env copied from .env.example carries. Both are wrong inside the image, so this
+          # asserts the compose environment: block still outranks env_file rather than testing the default.
+          PORT=18752
+          WEB_DIST_DIR=../web/dist
           BETTER_AUTH_SECRET=ci-smoke-better-auth-secret-0123456789
           BETTER_AUTH_URL=http://localhost:18752
           MAIL_TRANSPORT=json

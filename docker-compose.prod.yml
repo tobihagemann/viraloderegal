@@ -4,8 +4,10 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      # env_file .env may also carry PORT; this entry wins, so the container's port is fixed here.
+      # env_file .env may also carry PORT and WEB_DIST_DIR, and a .env copied from .env.example carries the
+      # dev value of both. These entries outrank env_file, so the container keeps the image's own values.
       PORT: 3000
+      WEB_DIST_DIR: /app/web
     # TLS is terminated by the reverse proxy (Traefik) in front of this.
     ports:
       - '127.0.0.1:${HOST_PORT:-18752}:3000'
@@ -19,6 +21,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # The entrypoint migrates before the server listens, so every probe until then fails. Without a start
+      # period those count toward retries, and a migration outlasting retries x interval reports unhealthy
+      # while it is still legitimately working — which fails `up --wait` well before its own timeout.
+      start_period: 60s
+      start_interval: 1s
 
   postgres:
     image: postgres:16-alpine
