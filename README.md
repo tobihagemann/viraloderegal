@@ -46,7 +46,7 @@ Schema lives in ordered, timestamp-named TypeScript migrations under `apps/api/m
 
 ## Deployment
 
-`docker build .` produces a single image that runs migrations on start, then serves the SPA, REST, and WebSocket on one port. `/health` backs the container healthcheck. `docker compose up` runs the app against a local Postgres.
+`docker build .` produces a single image that runs migrations on start, then serves the SPA, REST, and WebSocket on one port. `/health` backs the container healthcheck. `docker compose up` starts the dev Postgres alone. `docker compose -f docker-compose.prod.yml up` runs the image against its own Postgres, published on `127.0.0.1:${HOST_PORT:-18752}` for a TLS-terminating reverse proxy in front of it.
 
 ## License
 
