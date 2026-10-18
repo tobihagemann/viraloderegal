@@ -68,7 +68,9 @@ const envSchema = z
     }
   });
 
-const parsed = envSchema.safeParse(process.env);
+// `node --env-file` loads a blank `KEY=` line as '', which zod's .default() does not replace. Treat it as unset,
+// so a blank .env line takes the dev default and still fails fast in production.
+const parsed = envSchema.safeParse(Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== '')));
 if (!parsed.success) {
   console.error('Invalid environment configuration:', z.flattenError(parsed.error).fieldErrors);
   throw new Error('Invalid environment configuration');
