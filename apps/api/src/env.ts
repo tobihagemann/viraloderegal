@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import { isLoopbackBaseUrl } from './youtube/transport.js';
+import { isLoopbackBaseUrl, isLoopbackHostname } from './http/loopback.js';
 
 // In production every secret/endpoint must be set explicitly (fail fast on a missing value). In
 // dev/test each falls back to the local Docker Compose stack so it boots with zero config.
 export const isProduction = process.env.NODE_ENV === 'production';
 
 const requiredInProd = (devDefault: string) => (isProduction ? z.string().min(1) : z.string().min(1).default(devDefault));
+const envFlag = () => z.stringbool({ truthy: ['true', '1'], falsy: ['false', '0'] }).default(false);
 
 const DEV_DATABASE_URL = 'postgres://viraloderegal:viraloderegal@localhost:18753/viraloderegal';
 // better-auth documents a high-entropy ≥32-char secret. The dev default must itself be ≥32 chars or this
@@ -22,10 +23,7 @@ const envSchema = z
     // Trust X-Forwarded-For for the real client IP (rate-limit and ban keys). On only behind a proxy that
     // populates the header (Traefik in production); off in dev so the socket peer is used. Never trust it
     // unconditionally — an unproxied client could spoof the header.
-    TRUST_PROXY: z
-      .enum(['true', 'false', '1', '0'])
-      .default('false')
-      .transform((v) => v === 'true' || v === '1'),
+    TRUST_PROXY: envFlag(),
     // Directory holding the built SPA (apps/web/dist) the API serves in production. Never read in dev
     // (Vite serves the SPA), so the default is a placeholder; the image sets the absolute path.
     WEB_DIST_DIR: requiredInProd('../web/dist'),
@@ -41,8 +39,12 @@ const envSchema = z
     // Admin auth (better-auth) + invite email. Required in prod; dev/test fall back to working placeholders so
     // a bare checkout still boots. The secret must be ≥32 chars per better-auth.
     BETTER_AUTH_SECRET: isProduction ? z.string().min(32) : z.string().min(32).default(DEV_BETTER_AUTH_SECRET),
-    // Base URL better-auth uses to build invite/callback links.
-    BETTER_AUTH_URL: requiredInProd('http://localhost:18752'),
+    // Public origin better-auth and the invite links are built on. In production it is the only trusted origin,
+    // so a plain-http or loopback value boots healthy and then rejects every admin sign-in.
+    BETTER_AUTH_URL: isProduction ? z.url() : z.url().default('http://localhost:18752'),
+    // Test seam: admits an http:// loopback BETTER_AUTH_URL in production, because the e2e harness runs the
+    // production build on localhost. Never set it in a deployment.
+    ALLOW_LOOPBACK_AUTH_URL: envFlag(),
     SMTP_HOST: requiredInProd('localhost'),
     SMTP_PORT: isProduction ? z.coerce.number().int().positive() : z.coerce.number().int().positive().default(587),
     SMTP_USER: requiredInProd('viraloderegal'),
@@ -55,16 +57,25 @@ const envSchema = z
     BOOTSTRAP_ADMIN_EMAIL: requiredInProd('admin@viraloderegal.de'),
     BOOTSTRAP_ADMIN_PASSWORD: requiredInProd('viraloderegal'),
   })
-  // Fail closed on the YouTube base-URL override (YOUTUBE_API_KEY is appended to it, so an arbitrary override
-  // would exfiltrate the key). `fake` requires a loopback base URL; `live` forbids the override outright so a
-  // stray value fails fast rather than being silently ignored.
   .superRefine((cfg, ctx) => {
+    // Fail closed on the YouTube base-URL override (YOUTUBE_API_KEY is appended to it, so an arbitrary override
+    // would exfiltrate the key). `fake` requires a loopback base URL; `live` forbids the override outright so a
+    // stray value fails fast rather than being silently ignored.
     if (cfg.YOUTUBE_TRANSPORT === 'fake') {
       if (cfg.YOUTUBE_API_BASE_URL === undefined || !isLoopbackBaseUrl(cfg.YOUTUBE_API_BASE_URL)) {
         ctx.addIssue({ code: 'custom', path: ['YOUTUBE_API_BASE_URL'], message: 'fake transport requires a loopback http:// base URL' });
       }
     } else if (cfg.YOUTUBE_API_BASE_URL !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['YOUTUBE_API_BASE_URL'], message: 'YOUTUBE_API_BASE_URL is only honored in fake transport mode' });
+    }
+    // .superRefine still runs when z.url() rejected the field, so a malformed value must not reach new URL().
+    if (isProduction && URL.canParse(cfg.BETTER_AUTH_URL)) {
+      const url = new URL(cfg.BETTER_AUTH_URL);
+      const isPublicHttpsOrigin = url.protocol === 'https:' && !isLoopbackHostname(url.hostname);
+      const isAllowedTestOrigin = cfg.ALLOW_LOOPBACK_AUTH_URL && isLoopbackBaseUrl(cfg.BETTER_AUTH_URL);
+      if (!isPublicHttpsOrigin && !isAllowedTestOrigin) {
+        ctx.addIssue({ code: 'custom', path: ['BETTER_AUTH_URL'], message: 'BETTER_AUTH_URL must be a public https:// origin' });
+      }
     }
   });
 

@@ -64,7 +64,7 @@ jobs:
           PORT=18752
           WEB_DIST_DIR=../web/dist
           BETTER_AUTH_SECRET=ci-smoke-better-auth-secret-0123456789
-          BETTER_AUTH_URL=http://localhost:18752
+          BETTER_AUTH_URL=https://viraloderegal.de
           MAIL_TRANSPORT=json
           SMTP_HOST=localhost
           SMTP_PORT=587

@@ -55,6 +55,8 @@ export default defineConfig({
         YOUTUBE_API_KEY: 'e2e-fake-key',
         BETTER_AUTH_SECRET: 'e2e-better-auth-secret-0123456789-abcdef',
         BETTER_AUTH_URL: `http://localhost:${port}`,
+        // Production requires a public https auth origin, but the browser reaches this server on http://localhost.
+        ALLOW_LOOPBACK_AUTH_URL: '1',
         MAIL_TRANSPORT: 'json',
         SMTP_HOST: 'localhost',
         SMTP_PORT: '587',

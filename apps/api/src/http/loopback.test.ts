@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLoopbackBaseUrl } from './transport.js';
+import { isLoopbackBaseUrl } from './loopback.js';
 
 describe('isLoopbackBaseUrl', () => {
   it('accepts http loopback roots (IPv4, bracketed IPv6, localhost), with or without a port or trailing slash', () => {
