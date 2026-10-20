@@ -5,6 +5,8 @@
   // shifts. They are part of the schema's public surface, so treat in-file use as use — but only for types,
   // so genuinely dead value exports (functions/consts) are still reported even when self-referenced in-file.
   "ignoreExportsUsedInFile": { "interface": true, "type": true },
+  // macOS ships xcode-select; the icon export script asks it where Xcode lives.
+  "ignoreBinaries": ["xcode-select"],
   "workspaces": {
     ".": {
       // Launched by Playwright via a webServer command string, not statically imported (the Playwright plugin

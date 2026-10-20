@@ -19,6 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migrate": "pnpm --filter @viraloderegal/api migrate",
+    "icon": "pnpm --filter @viraloderegal/web icon",
     "prepare": "husky"
   },
   "lint-staged": {
